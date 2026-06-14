@@ -11,5 +11,5 @@ urlpatterns = [
         views.download_note_file,
         name="download_note_file",
     ),
-    path("<str:slug>/", views.note_detail, name="note_detail"),
+    path("<str:slug>/", views.note_add.detail, name="note_detail"),
 ]

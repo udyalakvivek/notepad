@@ -13,16 +13,24 @@
     <link rel="stylesheet" href="{% static 'myapp/note.css' %}">
 </head>
 <body>
+    <div class="ambient-glow ambient-glow-one" aria-hidden="true"></div>
+    <div class="ambient-glow ambient-glow-two" aria-hidden="true"></div>
+    <div class="noise-overlay" aria-hidden="true"></div>
     <main class="page">
         <section class="note-card">
             <header class="toolbar">
-                <a class="brand" href="#">
+                <a class="brand" href="/" aria-label="Create a new note">
                     <span class="brand-mark">n</span>
-                    <span>notepad</span>
+                    <span class="brand-copy">
+                        <strong>notepad</strong>
+                        <small>private workspace</small>
+                    </span>
                 </a>
 
                 <div class="search-box" role="search">
-                    <span class="search-icon" aria-hidden="true">⌕</span>
+                    <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/>
+                    </svg>
                     <input
                         id="note-search"
                         class="search-input"
@@ -43,18 +51,23 @@
                         aria-live="polite"
                     >Saved</span>
                     <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch theme" title="Switch theme">
-                        <span class="sun-icon" aria-hidden="true">☀</span>
-                        <span class="moon-icon" aria-hidden="true">☾</span>
+                        <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="4"/>
+                            <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20.5 15.6A9 9 0 0 1 8.4 3.5 9 9 0 1 0 20.5 15.6Z"/>
+                        </svg>
                     </button>
                     <button id="copy-url" class="action-button" type="button">Copy URL</button>
                     <button id="copy-text" class="action-button" type="button">Copy Text</button>
-                    <label id="attach-label" class="action-button attach-button">
+                    <label id="attach-label" class="action-button attach-button primary-action">
                         Attach File
                         <input id="file-input" type="file" hidden>
                     </label>
                     <div id="file-actions" class="file-actions" hidden>
                         <span id="file-name" class="file-name"></span>
-                        <a id="download-file" class="action-button download-button" href="#">Download</a>
+                        <a id="download-file" class="action-button" href="#">Download</a>
                         <button id="delete-file" class="action-button danger-button" type="button">Delete</button>
                     </div>
                 </div>
