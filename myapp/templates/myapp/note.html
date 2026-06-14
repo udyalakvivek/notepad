@@ -1,0 +1,92 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <title>Note {{ note.slug }}</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem("note-theme") || "dark";
+    </script>
+    <link rel="stylesheet" href="{% static 'myapp/note.css' %}">
+</head>
+<body>
+    <main class="page">
+        <section class="note-card">
+            <header class="toolbar">
+                <a class="brand" href="#">
+                    <span class="brand-mark">n</span>
+                    <span>notepad</span>
+                </a>
+
+                <div class="search-box" role="search">
+                    <span class="search-icon" aria-hidden="true">⌕</span>
+                    <input
+                        id="note-search"
+                        class="search-input"
+                        type="search"
+                        placeholder="Search note..."
+                        aria-label="Search note text"
+                        autocomplete="off"
+                    >
+                    <span id="search-count" class="search-count" aria-live="polite"></span>
+                </div>
+
+                <div class="toolbar-actions">
+                    <span
+                        id="save-status"
+                        class="save-status"
+                        data-state="saved"
+                        role="status"
+                        aria-live="polite"
+                    >Saved</span>
+                    <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch theme" title="Switch theme">
+                        <span class="sun-icon" aria-hidden="true">☀</span>
+                        <span class="moon-icon" aria-hidden="true">☾</span>
+                    </button>
+                    <button id="copy-url" class="action-button" type="button">Copy URL</button>
+                    <button id="copy-text" class="action-button" type="button">Copy Text</button>
+                    <label id="attach-label" class="action-button attach-button">
+                        Attach File
+                        <input id="file-input" type="file" hidden>
+                    </label>
+                    <div id="file-actions" class="file-actions" hidden>
+                        <span id="file-name" class="file-name"></span>
+                        <a id="download-file" class="action-button download-button" href="#">Download</a>
+                        <button id="delete-file" class="action-button danger-button" type="button">Delete</button>
+                    </div>
+                </div>
+            </header>
+
+            <form class="editor-form" onsubmit="return false;">
+                {% csrf_token %}
+                <div class="editor-wrap">
+                    <div id="search-highlights" class="search-highlights" aria-hidden="true"></div>
+                    <textarea
+                        id="note-editor"
+                        class="editor"
+                        data-api-url="{% url 'note_api' slug=note.slug %}"
+                        data-file-url="{% url 'note_file' slug=note.slug %}"
+                        aria-label="Note content"
+                        autocomplete="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        autofocus
+                        placeholder="Start writing..."
+                    >{{ note.content }}</textarea>
+                </div>
+            </form>
+
+            <footer class="note-footer">
+                <span id="file-status" class="file-status" role="status" aria-live="polite"></span>
+                <span>Words: <strong id="word-count">0</strong></span>
+                <span class="footer-divider" aria-hidden="true"></span>
+                <span>Characters: <strong id="character-count">0</strong></span>
+            </footer>
+        </section>
+    </main>
+    <script src="{% static 'myapp/note.js' %}"></script>
+</body>
+</html>
