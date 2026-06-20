@@ -7,8 +7,10 @@
     <meta name="color-scheme" content="dark light">
     <title>Note {{ note.slug }}</title>
     <script>
-        document.documentElement.dataset.theme =
-            localStorage.getItem("note-theme") || "dark";
+        const savedTheme = localStorage.getItem("note-theme");
+        document.documentElement.dataset.theme = ["dark", "light", "telegram"].includes(savedTheme)
+            ? savedTheme
+            : "dark";
     </script>
     <link rel="stylesheet" href="{% static 'myapp/note.css' %}">
 </head>
@@ -60,9 +62,46 @@
                         </svg>
                     </button>
                     <button id="copy-url" class="action-button" type="button">Copy URL</button>
+                    <label class="slug-picker" for="slug-select">
+                        <span>Slug</span>
+                        <select id="slug-select" class="slug-select" data-current-slug="{{ note.slug }}" aria-label="Choose static note slug">
+                            <option value="">Auto: {{ note.slug }}</option>
+                            {% for static_slug in static_note_slugs %}
+                                <option value="{% url 'note_detail' slug=static_slug %}"{% if static_slug == note.slug %} selected{% endif %}>{{ static_slug }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="password-box" for="note-password">
+                        <span class="password-field">
+                            <input
+                                id="note-password"
+                                class="password-input"
+                                type="password"
+                                placeholder="Password"
+                                autocomplete="new-password"
+                                aria-label="Note password"
+                            >
+                            <button class="password-eye" type="button" data-password-toggle="note-password" aria-label="Show password" title="Show password">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/>
+                                    <circle cx="12" cy="12" r="2.5"/>
+                                </svg>
+                            </button>
+                        </span>
+                        <button id="set-password" class="mini-button" type="button">Lock</button>
+                        <button id="clear-password" class="mini-button danger-button" type="button"{% if not has_password %} hidden{% endif %}>Remove</button>
+                    </label>
+                    <label class="history-picker" for="history-select">
+                        <span>History</span>
+                        <select id="history-select" class="history-select" aria-label="Choose note history version">
+                            <option value="">No history</option>
+                        </select>
+                        <button id="restore-history" class="mini-button" type="button" disabled>Restore</button>
+                    </label>
                     <button id="copy-text" class="action-button" type="button">Copy Text</button>
-                    <label id="attach-label" class="action-button attach-button primary-action">
-                        Attach File
+                    <label id="attach-label" class="action-button attach-button primary-action" aria-live="polite">
+                        <span class="attach-label-text">Attach File</span>
+                        <span class="upload-loader" aria-hidden="true"></span>
                         <input id="file-input" type="file" hidden>
                     </label>
                     <div id="file-actions" class="file-actions" hidden>
@@ -73,8 +112,33 @@
                 </div>
             </header>
 
-            <form class="editor-form" onsubmit="return false;">
+            <form class="editor-form{% if locked %} is-locked{% endif %}" onsubmit="return false;">
                 {% csrf_token %}
+                <div id="lock-panel" class="lock-panel"{% if not locked %} hidden{% endif %}>
+                    <div class="lock-dialog">
+                        <strong>Locked note</strong>
+                        <div class="unlock-row">
+                            <span class="password-field unlock-password-field">
+                                <input
+                                    id="unlock-password"
+                                    class="password-input"
+                                    type="password"
+                                    placeholder="Enter password"
+                                    autocomplete="current-password"
+                                    aria-label="Unlock password"
+                                >
+                                <button class="password-eye" type="button" data-password-toggle="unlock-password" aria-label="Show password" title="Show password">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/>
+                                        <circle cx="12" cy="12" r="2.5"/>
+                                    </svg>
+                                </button>
+                            </span>
+                            <button id="unlock-note" class="action-button primary-action" type="button">Unlock</button>
+                        </div>
+                        <span id="lock-message" class="lock-message" role="status" aria-live="polite"></span>
+                    </div>
+                </div>
                 <div class="editor-wrap">
                     <div id="search-highlights" class="search-highlights" aria-hidden="true"></div>
                     <textarea
@@ -82,18 +146,26 @@
                         class="editor"
                         data-api-url="{% url 'note_api' slug=note.slug %}"
                         data-file-url="{% url 'note_file' slug=note.slug %}"
+                        data-unlock-url="{% url 'note_unlock' slug=note.slug %}"
+                        data-password-url="{% url 'note_password' slug=note.slug %}"
+                        data-history-url="{% url 'note_history' slug=note.slug %}"
+                        data-locked="{% if locked %}true{% else %}false{% endif %}"
+                        data-has-password="{% if has_password %}true{% else %}false{% endif %}"
+                        data-updated-at="{{ note.updated_at|date:'c' }}"
                         aria-label="Note content"
                         autocomplete="off"
                         autocapitalize="off"
                         spellcheck="false"
-                        autofocus
+                        {% if not locked %}autofocus{% else %}disabled{% endif %}
                         placeholder="Start writing..."
-                    >{{ note.content }}</textarea>
+                    >{% if not locked %}{{ note.content }}{% endif %}</textarea>
                 </div>
             </form>
 
             <footer class="note-footer">
                 <span id="file-status" class="file-status" role="status" aria-live="polite"></span>
+                <span id="line-count-wrap">Lines: <strong id="line-count">0 / 2000</strong></span>
+                <span class="footer-divider" aria-hidden="true"></span>
                 <span>Words: <strong id="word-count">0</strong></span>
                 <span class="footer-divider" aria-hidden="true"></span>
                 <span>Characters: <strong id="character-count">0</strong></span>

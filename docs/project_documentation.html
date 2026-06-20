@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="hi">
+<head>
+    <meta charset="utf-8">
+    <title>Personal Paste Project Documentation</title>
+    <style>
+        @font-face {
+            font-family: "NotoDevanagari";
+            src: url("file:///usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf");
+        }
+
+        @font-face {
+            font-family: "NotoDevanagari";
+            src: url("file:///usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf");
+            font-weight: 700;
+        }
+
+        @page {
+            size: A4;
+            margin: 18mm 16mm;
+        }
+
+        body {
+            color: #1d2733;
+            font-family: "NotoDevanagari", Arial, sans-serif;
+            font-size: 11.5pt;
+            line-height: 1.55;
+            margin: 0;
+        }
+
+        h1 {
+            color: #0f3f5f;
+            font-size: 26pt;
+            line-height: 1.15;
+            margin: 0 0 8px;
+        }
+
+        h2 {
+            border-bottom: 1px solid #c9d6df;
+            color: #0f3f5f;
+            font-size: 17pt;
+            margin: 26px 0 10px;
+            padding-bottom: 4px;
+        }
+
+        h3 {
+            color: #25394b;
+            font-size: 13.5pt;
+            margin: 18px 0 6px;
+        }
+
+        p {
+            margin: 6px 0 10px;
+        }
+
+        ul, ol {
+            margin: 6px 0 12px 21px;
+            padding: 0;
+        }
+
+        li {
+            margin: 4px 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 10px 0 16px;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #c9d6df;
+            padding: 7px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #eaf2f7;
+            color: #17364d;
+            font-weight: 700;
+        }
+
+        code {
+            background: #eef3f6;
+            border-radius: 3px;
+            color: #12384f;
+            font-family: "NotoDevanagari", monospace;
+            padding: 1px 4px;
+        }
+
+        .cover {
+            background: #eaf2f7;
+            border-left: 5px solid #1e7aa8;
+            margin-bottom: 18px;
+            padding: 16px 18px;
+        }
+
+        .muted {
+            color: #596b79;
+        }
+
+        .note {
+            background: #f6f9fb;
+            border: 1px solid #d8e3ea;
+            border-radius: 6px;
+            margin: 12px 0;
+            padding: 10px 12px;
+        }
+
+        .page-break {
+            break-before: page;
+        }
+    </style>
+</head>
+<body>
+    <section class="cover">
+        <h1>Personal Paste / Notepad Project Documentation</h1>
+        <p><strong>Simple Hindi-English Guide</strong></p>
+        <p class="muted">Yeh document project ke model fields, URLs, structure, save flow, slug generation, file upload, aur complete working ko simple language me explain karta hai.</p>
+    </section>
+
+    <h2>1. Project Overview</h2>
+    <p>
+        Yeh project ek small Django based no-login notepad / pastebin app hai. User jab home page <code>/</code> open karta hai, app ek new note create karta hai aur user ko random private URL par redirect kar deta hai.
+    </p>
+    <p>
+        Jo person note ka URL jaanta hai, woh note read aur edit kar sakta hai. Is project me login system nahi hai, isliye privacy ka main control URL slug hai.
+    </p>
+
+    <h2>2. Technology Stack</h2>
+    <table>
+        <tr><th>Part</th><th>Use</th></tr>
+        <tr><td>Django</td><td>Backend framework, routes, views, model, database handling.</td></tr>
+        <tr><td>SQLite / MySQL</td><td>Default local database SQLite hai. Environment variable <code>DB_ENGINE=mysql</code> set karne par MySQL use hota hai.</td></tr>
+        <tr><td>HTML Template</td><td>Editor UI render karta hai.</td></tr>
+        <tr><td>JavaScript</td><td>Auto-save, remote refresh, search, copy URL/text, file upload/delete handle karta hai.</td></tr>
+        <tr><td>CSS</td><td>Dark/light theme aur page design.</td></tr>
+    </table>
+
+    <h2>3. Folder Structure</h2>
+    <table>
+        <tr><th>Path</th><th>Meaning</th></tr>
+        <tr><td><code>manage.py</code></td><td>Django commands run karne ke liye main file.</td></tr>
+        <tr><td><code>notepad/settings.py</code></td><td>Project settings: installed apps, database, static/media path.</td></tr>
+        <tr><td><code>notepad/urls.py</code></td><td>Root URL routing. Admin aur <code>myapp.urls</code> include karta hai.</td></tr>
+        <tr><td><code>myapp/models.py</code></td><td>Database model <code>Note</code> yahin define hai.</td></tr>
+        <tr><td><code>myapp/views.py</code></td><td>Business logic: note create, detail page, API save, file upload/download.</td></tr>
+        <tr><td><code>myapp/urls.py</code></td><td>App level URLs define karta hai.</td></tr>
+        <tr><td><code>myapp/templates/myapp/note.html</code></td><td>Note editor page ka HTML.</td></tr>
+        <tr><td><code>myapp/static/myapp/note.js</code></td><td>Frontend behavior and API calls.</td></tr>
+        <tr><td><code>myapp/static/myapp/note.css</code></td><td>Styling and theme.</td></tr>
+        <tr><td><code>media/notes/</code></td><td>Uploaded note files store hote hain.</td></tr>
+    </table>
+
+    <h2>4. Database Model: Note</h2>
+    <p>Project me main model sirf ek hai: <code>Note</code>. Isme note ka content, slug, attachment details, aur timestamps store hote hain.</p>
+    <table>
+        <tr><th>Field</th><th>Type</th><th>Details</th></tr>
+        <tr><td><code>slug</code></td><td><code>CharField(max_length=20, unique=True)</code></td><td>Unique URL identifier. Example: <code>xqj25ft9</code>. Har note ka slug different hota hai.</td></tr>
+        <tr><td><code>content</code></td><td><code>TextField(blank=True)</code></td><td>Note ka text content. Empty bhi ho sakta hai.</td></tr>
+        <tr><td><code>attachment</code></td><td><code>FileField(upload_to=attachment_upload_path, blank=True)</code></td><td>Note ke saath ek file attach karne ke liye.</td></tr>
+        <tr><td><code>attachment_name</code></td><td><code>CharField(max_length=255, blank=True)</code></td><td>Original uploaded file ka safe name store karta hai.</td></tr>
+        <tr><td><code>attachment_size</code></td><td><code>PositiveBigIntegerField(default=0)</code></td><td>File size bytes me store hoti hai.</td></tr>
+        <tr><td><code>attachment_uploaded_at</code></td><td><code>DateTimeField(null=True, blank=True)</code></td><td>File upload time. File expiry calculate karne me use hota hai.</td></tr>
+        <tr><td><code>created_at</code></td><td><code>DateTimeField(auto_now_add=True)</code></td><td>Note create hone ka time.</td></tr>
+        <tr><td><code>updated_at</code></td><td><code>DateTimeField(auto_now=True)</code></td><td>Note last update hone ka time.</td></tr>
+    </table>
+    <div class="note">
+        <strong>Ordering:</strong> Model ki <code>Meta</code> class me <code>ordering = ["-updated_at"]</code> hai, matlab latest updated notes first aayenge agar list query chalti hai.
+    </div>
+
+    <h2>5. Slug Generation Kaise Hota Hai</h2>
+    <p>
+        Slug create karne ka code <code>views.py</code> ke <code>create_note()</code> function me hai.
+    </p>
+    <ol>
+        <li>Allowed characters: lowercase alphabets <code>a-z</code> aur digits <code>0-9</code>.</li>
+        <li>Slug length: <code>8</code> characters.</li>
+        <li>Python <code>secrets.choice()</code> use hota hai, jo cryptographically strong random value deta hai.</li>
+        <li>App <code>Note.objects.create(slug=slug)</code> se note save karta hai.</li>
+        <li>Agar same slug already exist karta hai, database <code>IntegrityError</code> dega because slug unique hai.</li>
+        <li>Collision aane par app dobara try karta hai. Maximum <code>10</code> attempts hote hain.</li>
+        <li>10 attempts fail hone par <code>RuntimeError</code> raise hota hai.</li>
+    </ol>
+    <p>
+        Simple words me: home page open karte hi app ek random private link banata hai, note database me save karta hai, aur user ko us link par bhej deta hai.
+    </p>
+
+    <h2>6. URLs / Routes</h2>
+    <table>
+        <tr><th>URL</th><th>Method</th><th>View</th><th>Work</th></tr>
+        <tr><td><code>/admin/</code></td><td>GET/POST</td><td>Django admin</td><td>Admin panel.</td></tr>
+        <tr><td><code>/</code></td><td>GET</td><td><code>home</code></td><td>New note create karta hai aur <code>/&lt;slug&gt;/</code> par redirect karta hai.</td></tr>
+        <tr><td><code>/&lt;slug&gt;/</code></td><td>GET</td><td><code>note_detail</code></td><td>Note editor page render karta hai.</td></tr>
+        <tr><td><code>/api/&lt;slug&gt;/</code></td><td>GET</td><td><code>note_api</code></td><td>Latest note data JSON me return karta hai.</td></tr>
+        <tr><td><code>/api/&lt;slug&gt;/</code></td><td>POST</td><td><code>note_api</code></td><td>JSON body se note content save karta hai.</td></tr>
+        <tr><td><code>/api/&lt;slug&gt;/file/</code></td><td>POST</td><td><code>note_file</code></td><td>File upload karta hai. Ek note me ek time par sirf one attachment allowed hai.</td></tr>
+        <tr><td><code>/api/&lt;slug&gt;/file/</code></td><td>DELETE</td><td><code>note_file</code></td><td>Attached file delete karta hai.</td></tr>
+        <tr><td><code>/api/&lt;slug&gt;/file/download/</code></td><td>GET</td><td><code>download_note_file</code></td><td>Attached file download karta hai.</td></tr>
+    </table>
+
+    <h2>7. Note Save Flow</h2>
+    <h3>Frontend Side</h3>
+    <ol>
+        <li>User textarea me type karta hai.</li>
+        <li><code>note.js</code> input event pakadta hai.</li>
+        <li>Status <code>Typing...</code> show hota hai.</li>
+        <li>App <code>2000 ms</code> wait karta hai. Is delay ko <code>SAVE_DELAY_MS</code> kaha gaya hai.</li>
+        <li>Agar content last saved content se different hai, browser <code>POST /api/&lt;slug&gt;/</code> call karta hai.</li>
+        <li>Request JSON body: <code>{"content": "user text"}</code>.</li>
+        <li>CSRF token header <code>X-CSRFToken</code> ke through send hota hai.</li>
+    </ol>
+
+    <h3>Backend Side</h3>
+    <ol>
+        <li><code>note_api()</code> slug se note find karta hai.</li>
+        <li>Expired large attachment hai to pehle remove kar sakta hai.</li>
+        <li>JSON body parse hoti hai.</li>
+        <li>Content string hona required hai. Agar string nahi hai to <code>400</code> error.</li>
+        <li>Agar new content old content se different hai, only <code>content</code> aur <code>updated_at</code> save hote hain.</li>
+        <li>Response me note payload return hota hai: slug, content, updated_at, attachment, aur changed flag.</li>
+    </ol>
+    <div class="note">
+        Save optimized hai: frontend bhi same content save nahi bhejta, aur backend bhi unchanged content par unnecessary database update nahi karta.
+    </div>
+
+    <h2>8. Remote Refresh / Multi-tab Behavior</h2>
+    <p>
+        Frontend time-to-time <code>GET /api/&lt;slug&gt;/</code> call karta hai. Agar note kisi aur tab/browser se update hua ho, current editor automatically latest content load kar leta hai.
+    </p>
+    <p>
+        Refresh interval user activity ke according change hota hai: active user ke liye fast refresh, idle user ke liye slow refresh. Hidden tab me polling stop ho jati hai.
+    </p>
+
+    <h2>9. File Upload Flow</h2>
+    <ol>
+        <li>User <code>Attach File</code> button se file select karta hai.</li>
+        <li>JavaScript <code>FormData</code> banata hai aur <code>file</code> key me selected file append karta hai.</li>
+        <li>Browser <code>POST /api/&lt;slug&gt;/file/</code> call karta hai.</li>
+        <li>Backend transaction ke andar note ko <code>select_for_update()</code> se lock karta hai, taaki same time par conflicting upload/delete na ho.</li>
+        <li>Agar note me already attachment hai, response <code>409</code> aata hai: pehle old file delete karni hogi.</li>
+        <li>File save hoti hai, name, size, upload time database me store hote hain.</li>
+        <li>Response me attachment payload return hota hai.</li>
+    </ol>
+
+    <h3>Attachment Path</h3>
+    <p>
+        Uploaded file ka path <code>attachment_upload_path()</code> function banata hai:
+    </p>
+    <p><code>notes/&lt;note-slug&gt;/&lt;random-32-hex&gt;&lt;file-extension&gt;</code></p>
+    <p>
+        Example: <code>notes/xqj25ft9/4af2...c91.pdf</code>. Isse filename collision avoid hota hai aur files note slug ke folder me organize hoti hain.
+    </p>
+
+    <h2>10. File Delete And Download</h2>
+    <table>
+        <tr><th>Action</th><th>Process</th></tr>
+        <tr><td>Delete</td><td><code>DELETE /api/&lt;slug&gt;/file/</code> call hota hai. Backend actual file delete karta hai, attachment fields empty karta hai, aur JSON me <code>{"attachment": null}</code> return karta hai.</td></tr>
+        <tr><td>Download</td><td><code>GET /api/&lt;slug&gt;/file/download/</code> call hota hai. File available hai to <code>FileResponse</code> attachment ke form me return hota hai.</td></tr>
+        <tr><td>Missing file</td><td>Agar database me file record hai but disk par file missing hai, backend fields clear karta hai aur <code>404</code> return karta hai.</td></tr>
+    </table>
+
+    <h2>11. Large File Expiry</h2>
+    <p>
+        Is project me file size agar <code>5 MB</code> se zyada hai, to file upload ke <code>3 hours</code> baad expire ho jati hai.
+    </p>
+    <p>
+        Expiry check <code>remove_expired_attachment()</code> function karta hai. Yeh page open, API get/post, file upload/delete, aur download ke time call hota hai. Expired file milne par <code>clear_attachment()</code> actual file aur database fields clear kar deta hai.
+    </p>
+
+    <h2>12. API Response Structure</h2>
+    <h3>Note Payload</h3>
+    <table>
+        <tr><th>Key</th><th>Meaning</th></tr>
+        <tr><td><code>slug</code></td><td>Note ka unique URL slug.</td></tr>
+        <tr><td><code>content</code></td><td>Note text.</td></tr>
+        <tr><td><code>updated_at</code></td><td>Last update time ISO format me.</td></tr>
+        <tr><td><code>attachment</code></td><td>Attachment object ya <code>null</code>.</td></tr>
+        <tr><td><code>changed</code></td><td>POST save ke time optional flag, batata hai content actually changed tha ya nahi.</td></tr>
+    </table>
+
+    <h3>Attachment Payload</h3>
+    <table>
+        <tr><th>Key</th><th>Meaning</th></tr>
+        <tr><td><code>name</code></td><td>Original file name.</td></tr>
+        <tr><td><code>size</code></td><td>File size bytes me.</td></tr>
+        <tr><td><code>uploaded_at</code></td><td>Upload time ISO format me.</td></tr>
+        <tr><td><code>download_url</code></td><td>File download endpoint.</td></tr>
+        <tr><td><code>expires_at</code></td><td>Only large files ke liye expiry time, otherwise <code>null</code>.</td></tr>
+    </table>
+
+    <h2>13. UI Features</h2>
+    <ul>
+        <li>Dark/light theme toggle. Theme browser <code>localStorage</code> me save hota hai.</li>
+        <li>Copy URL button current note link clipboard me copy karta hai.</li>
+        <li>Copy Text button note content clipboard me copy karta hai.</li>
+        <li>Search box note ke andar matches find karta hai.</li>
+        <li>Word count aur character count live update hote hain.</li>
+        <li>Save status: <code>Saved</code>, <code>Typing...</code>, <code>Saving...</code>, <code>Error</code>.</li>
+        <li>Attachment section file name, size, download, and delete actions show karta hai.</li>
+    </ul>
+
+    <h2>14. Database And Media Settings</h2>
+    <table>
+        <tr><th>Setting</th><th>Value / Use</th></tr>
+        <tr><td><code>DATABASES</code></td><td>Default SQLite: <code>BASE_DIR / "db.sqlite3"</code>. MySQL optional hai via environment variables.</td></tr>
+        <tr><td><code>STATIC_URL</code></td><td><code>static/</code></td></tr>
+        <tr><td><code>STATIC_ROOT</code></td><td><code>BASE_DIR / "staticfiles"</code></td></tr>
+        <tr><td><code>MEDIA_ROOT</code></td><td><code>BASE_DIR / "media"</code></td></tr>
+        <tr><td><code>TIME_ZONE</code></td><td><code>UTC</code></td></tr>
+        <tr><td><code>USE_TZ</code></td><td><code>True</code>, timestamps timezone aware hote hain.</td></tr>
+    </table>
+
+    <h2>15. Local Setup Commands</h2>
+    <ol>
+        <li><code>python -m venv notevenv</code></li>
+        <li><code>source notevenv/bin/activate</code></li>
+        <li><code>pip install django</code></li>
+        <li><code>python manage.py migrate</code></li>
+        <li><code>python manage.py runserver</code></li>
+        <li>Browser me open karein: <code>http://127.0.0.1:8000/</code></li>
+    </ol>
+
+    <h2>16. Complete Working In Short</h2>
+    <ol>
+        <li>User <code>/</code> open karta hai.</li>
+        <li>Backend random slug se blank note create karta hai.</li>
+        <li>User <code>/&lt;slug&gt;/</code> editor page par redirect hota hai.</li>
+        <li>User type karta hai, frontend 2 seconds baad changed content API ko bhejta hai.</li>
+        <li>Backend content validate karke database me save karta hai.</li>
+        <li>Frontend response ke baad status <code>Saved</code> show karta hai.</li>
+        <li>User file attach kar sakta hai; one note me one file allowed hai.</li>
+        <li>Large file 5 MB se zyada ho to 3 hours baad auto cleanup ho sakti hai.</li>
+        <li>Same URL kisi aur ko share karne par woh bhi note read/edit kar sakta hai.</li>
+    </ol>
+
+    <h2>17. Important Points</h2>
+    <ul>
+        <li>Login/authentication nahi hai. URL jiske paas hai, access uske paas hai.</li>
+        <li>Slug strong random hai, but URL share carefully karna chahiye.</li>
+        <li>CSRF protection enabled hai for browser API requests.</li>
+        <li>Only one attachment per note supported hai.</li>
+        <li>Production me <code>DJANGO_SECRET_KEY</code>, <code>DJANGO_DEBUG=False</code>, HTTPS, aur proper host settings use karna chahiye.</li>
+    </ul>
+</body>
+</html>

@@ -14,6 +14,9 @@
     --accent: #a78bfa;
     --accent-bright: #c4b5fd;
     --focus: #a78bfa;
+    --select-bg: #151827;
+    --select-text: #f2f1ff;
+    --select-hover: #2d3350;
     --shadow: rgba(0, 0, 0, 0.52);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -34,7 +37,32 @@
     --accent: #7c5cda;
     --accent-bright: #6847cb;
     --focus: #7c5cda;
+    --select-bg: #ffffff;
+    --select-text: #25243a;
+    --select-hover: #e9e4ff;
     --shadow: rgba(52, 48, 80, 0.2);
+}
+
+:root[data-theme="telegram"] {
+    color-scheme: light;
+    --page-bg: #d8f3ff;
+    --card-bg: rgba(255, 255, 255, 0.42);
+    --toolbar-bg: rgba(238, 250, 255, 0.46);
+    --editor-bg: rgba(255, 255, 255, 0.22);
+    --text: #11233b;
+    --muted: #557084;
+    --faint: #87a3b5;
+    --border: rgba(54, 132, 172, 0.18);
+    --border-bright: rgba(43, 171, 226, 0.38);
+    --button-bg: rgba(255, 255, 255, 0.44);
+    --button-hover: rgba(255, 255, 255, 0.72);
+    --accent: #229ed9;
+    --accent-bright: #0b84bd;
+    --focus: #229ed9;
+    --select-bg: #eefbff;
+    --select-text: #11233b;
+    --select-hover: #c8efff;
+    --shadow: rgba(27, 100, 140, 0.22);
 }
 
 * {
@@ -71,6 +99,22 @@ body::before {
         radial-gradient(circle at 14% 12%, rgba(155, 125, 229, 0.3), transparent 32%),
         radial-gradient(circle at 88% 82%, rgba(74, 182, 199, 0.2), transparent 30%),
         linear-gradient(145deg, #e6e8f4 0%, #f1f2f8 52%, #e7ebf3 100%);
+}
+
+[data-theme="telegram"] body::before {
+    background:
+        linear-gradient(160deg, rgba(255, 255, 255, 0.2), transparent 35%),
+        radial-gradient(circle at 16% 10%, rgba(124, 210, 255, 0.7), transparent 34%),
+        radial-gradient(circle at 92% 86%, rgba(114, 232, 201, 0.34), transparent 28%),
+        linear-gradient(145deg, #bfefff 0%, #eefbff 48%, #dff7ff 100%);
+}
+
+[data-theme="telegram"] .ambient-glow-one {
+    background: radial-gradient(circle, rgba(34, 158, 217, 0.28), transparent 68%);
+}
+
+[data-theme="telegram"] .ambient-glow-two {
+    background: radial-gradient(circle, rgba(43, 194, 174, 0.2), transparent 69%);
 }
 
 button,
@@ -146,10 +190,10 @@ textarea {
 
 .toolbar {
     display: grid;
-    grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 30rem) minmax(24rem, 1fr);
+    grid-template-columns: 12rem minmax(10rem, 20rem) minmax(0, 1fr);
     flex: 0 0 auto;
     align-items: center;
-    gap: 1.25rem;
+    gap: 0.85rem;
     min-height: 4.75rem;
     padding: 0.8rem 1.25rem;
     border-bottom: 1px solid var(--border);
@@ -208,6 +252,7 @@ textarea {
     display: flex;
     align-items: center;
     width: 100%;
+    max-width: 20rem;
     min-width: 0;
     height: 2.55rem;
     padding: 0 0.8rem;
@@ -271,28 +316,39 @@ textarea {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: 0.45rem;
     min-width: 0;
 }
 
 .save-status {
-    min-width: 3.8rem;
-    margin-right: 0.2rem;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-width: 6.4rem;
+    min-height: 2.35rem;
+    padding: 0.35rem 0.62rem;
+    border: 1px solid var(--border);
+    border-radius: 0.72rem;
+    background: var(--button-bg);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
     color: var(--muted);
-    font-size: 0.75rem;
-    text-align: right;
+    font-size: 0.72rem;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .save-status::before {
-    display: inline-block;
+    display: block;
+    flex: 0 0 auto;
     width: 0.38rem;
     height: 0.38rem;
-    margin-right: 0.4rem;
     border-radius: 50%;
     background: currentColor;
     box-shadow: 0 0 9px currentColor;
     content: "";
-    vertical-align: 0.08rem;
 }
 
 .save-status[data-state="saving"] {
@@ -348,6 +404,181 @@ textarea {
     white-space: nowrap;
 }
 
+.slug-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.35rem;
+    padding: 0.2rem 0.35rem 0.2rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 0.72rem;
+    background: var(--button-bg);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 560;
+    white-space: nowrap;
+}
+
+.slug-select {
+    max-width: 9.5rem;
+    min-height: 1.85rem;
+    border: 0;
+    border-radius: 0.52rem;
+    outline: 0;
+    padding: 0.25rem 1.6rem 0.25rem 0.55rem;
+    background: color-mix(in srgb, var(--button-hover) 72%, transparent);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.74rem;
+}
+
+.slug-select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.slug-select option {
+    background: var(--select-bg);
+    color: var(--select-text);
+}
+
+.slug-select option:checked,
+.slug-select option:hover {
+    background: var(--select-hover);
+    color: var(--select-text);
+}
+
+.slug-select:disabled {
+    cursor: wait;
+    opacity: 0.68;
+}
+
+.password-box,
+.history-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.35rem;
+    padding: 0.2rem 0.35rem 0.2rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 0.72rem;
+    background: var(--button-bg);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 560;
+    white-space: nowrap;
+}
+
+.password-input,
+.history-select {
+    min-height: 1.85rem;
+    border: 0;
+    border-radius: 0.52rem;
+    outline: 0;
+    background: color-mix(in srgb, var(--button-hover) 72%, transparent);
+    color: var(--text);
+    font-size: 0.74rem;
+}
+
+.password-input {
+    width: 7.2rem;
+    padding: 0.25rem 1.95rem 0.25rem 0.55rem;
+}
+
+.password-field {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.password-eye {
+    position: absolute;
+    right: 0.28rem;
+    display: grid;
+    width: 1.45rem;
+    height: 1.45rem;
+    border: 0;
+    border-radius: 0.42rem;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    place-items: center;
+}
+
+.password-eye svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.password-eye:hover {
+    background: var(--button-hover);
+    color: var(--text);
+}
+
+.password-eye.is-visible {
+    color: var(--accent-bright);
+}
+
+.history-select {
+    max-width: 10rem;
+    padding: 0.25rem 1.4rem 0.25rem 0.55rem;
+    cursor: pointer;
+}
+
+.history-select option {
+    background: var(--select-bg);
+    color: var(--select-text);
+}
+
+.password-input::placeholder {
+    color: var(--faint);
+}
+
+.password-input:focus-visible,
+.history-select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.mini-button {
+    min-height: 1.85rem;
+    border: 1px solid var(--border);
+    border-radius: 0.52rem;
+    padding: 0.25rem 0.55rem;
+    background: var(--button-bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.mini-button:hover:not(:disabled) {
+    border-color: var(--border-bright);
+    background: var(--button-hover);
+}
+
+.mini-button:disabled,
+.action-button:disabled,
+.password-input:disabled,
+.history-select:disabled,
+.slug-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    pointer-events: none;
+}
+
 .icon-button:hover,
 .action-button:hover {
     border-color: var(--border-bright);
@@ -378,9 +609,41 @@ textarea {
     display: none;
 }
 
+.attach-button {
+    gap: 0.45rem;
+}
+
 .attach-button.is-busy {
-    opacity: 0.65;
     pointer-events: none;
+}
+
+.upload-loader {
+    display: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: upload-spin 700ms linear infinite;
+}
+
+.attach-button.is-busy .upload-loader {
+    display: inline-block;
+}
+
+.attach-button.is-busy .attach-label-text {
+    font-size: 0;
+}
+
+.attach-button.is-busy .attach-label-text::after {
+    font-size: 0.76rem;
+    content: "Uploading";
+}
+
+@keyframes upload-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .file-actions {
@@ -415,11 +678,13 @@ textarea {
     display: none;
 }
 
-[data-theme="light"] .sun-icon {
+[data-theme="light"] .sun-icon,
+[data-theme="telegram"] .sun-icon {
     display: inline;
 }
 
-[data-theme="light"] .moon-icon {
+[data-theme="light"] .moon-icon,
+[data-theme="telegram"] .moon-icon {
     display: none;
 }
 
@@ -435,6 +700,58 @@ textarea {
     width: 100%;
     height: 100%;
     min-height: 0;
+}
+
+.lock-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--page-bg) 35%, transparent);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.lock-panel[hidden] {
+    display: none;
+}
+
+.lock-dialog {
+    display: grid;
+    gap: 0.85rem;
+    width: min(100%, 24rem);
+    padding: 1.1rem;
+    border: 1px solid var(--border-bright);
+    border-radius: 0.9rem;
+    background: var(--toolbar-bg);
+    box-shadow: 0 20px 60px var(--shadow);
+}
+
+.lock-dialog strong {
+    color: var(--text);
+    font-size: 0.95rem;
+}
+
+.unlock-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.unlock-row .password-input {
+    flex: 1 1 auto;
+}
+
+.lock-message {
+    min-height: 1rem;
+    color: var(--muted);
+    font-size: 0.74rem;
+}
+
+.editor-form.is-locked .editor,
+.editor-form.is-locked .search-highlights {
+    opacity: 0.18;
 }
 
 .editor,
@@ -522,6 +839,11 @@ textarea {
     font-weight: 600;
 }
 
+.note-footer .is-warning,
+.note-footer .is-warning strong {
+    color: #f07b72;
+}
+
 .footer-divider {
     width: 1px;
     height: 0.75rem;
@@ -530,7 +852,7 @@ textarea {
 
 @media (max-width: 1050px) {
     .toolbar {
-        grid-template-columns: auto minmax(10rem, 1fr);
+        grid-template-columns: 11rem minmax(10rem, 1fr);
         grid-template-areas:
             "brand search"
             "actions actions";
@@ -586,6 +908,19 @@ textarea {
     .action-button {
         padding-inline: 0.55rem;
         font-size: 0.72rem;
+    }
+
+    .slug-picker {
+        padding-left: 0.55rem;
+    }
+
+    .slug-select,
+    .history-select {
+        max-width: 8rem;
+    }
+
+    .password-input {
+        width: 6.5rem;
     }
 
     .file-name {

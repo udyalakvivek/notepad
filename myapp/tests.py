@@ -10,8 +10,8 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Note
-from .views import LARGE_FILE_BYTES
+from .models import Note, NoteHistory
+from .views import LARGE_FILE_BYTES, MAX_NOTE_LINES, STATIC_NOTE_SLUGS
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp()
 
@@ -26,7 +26,7 @@ class NoteViewsTests(TestCase):
     def test_home_creates_note_and_redirects(self):
         response = self.client.get(reverse("home"))
 
-        note = Note.objects.get()
+        note = Note.objects.exclude(slug__in=STATIC_NOTE_SLUGS).get()
         self.assertRedirects(
             response,
             reverse("note_detail", kwargs={"slug": note.slug}),
@@ -34,6 +34,24 @@ class NoteViewsTests(TestCase):
         )
         self.assertRegex(note.slug, re.compile(r"^[a-z0-9]{8}$"))
         self.assertEqual(response.url, f"/{note.slug}/")
+
+    def test_home_ensures_static_notes_exist(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            Note.objects.filter(slug__in=STATIC_NOTE_SLUGS).count(),
+            len(STATIC_NOTE_SLUGS),
+        )
+
+    def test_static_note_slug_is_created_on_visit(self):
+        slug = STATIC_NOTE_SLUGS[0]
+
+        response = self.client.get(reverse("note_detail", kwargs={"slug": slug}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Note.objects.filter(slug=slug).exists())
+        self.assertContains(response, slug)
 
     @patch("myapp.views.secrets.choice")
     def test_slug_collision_is_retried(self, choice):
@@ -92,6 +110,132 @@ class NoteViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["changed"])
         self.assertEqual(note.content, "new content")
+
+    def test_password_is_saved_plaintext_and_locks_api(self):
+        note = Note.objects.create(slug="sample", content="secret")
+
+        set_response = self.client.post(
+            reverse("note_password", kwargs={"slug": note.slug}),
+            data=json.dumps({"password": "plain-pass"}),
+            content_type="application/json",
+        )
+
+        note.refresh_from_db()
+        self.assertEqual(set_response.status_code, 200)
+        self.assertEqual(note.password, "plain-pass")
+
+        locked_client = Client()
+        locked_response = locked_client.get(reverse("note_api", kwargs={"slug": note.slug}))
+        self.assertEqual(locked_response.status_code, 423)
+
+        unlock_response = locked_client.post(
+            reverse("note_unlock", kwargs={"slug": note.slug}),
+            data=json.dumps({"password": "plain-pass"}),
+            content_type="application/json",
+        )
+        self.assertEqual(unlock_response.status_code, 200)
+        self.assertEqual(unlock_response.json()["content"], "secret")
+
+    def test_wrong_password_cannot_unlock_note(self):
+        note = Note.objects.create(
+            slug="sample",
+            content="secret",
+            password="plain-pass",
+        )
+
+        response = self.client.post(
+            reverse("note_unlock", kwargs={"slug": note.slug}),
+            data=json.dumps({"password": "wrong"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_note_history_snapshot_and_restore(self):
+        note = Note.objects.create(slug="sample", content="first")
+
+        save_response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"content": "second"}),
+            content_type="application/json",
+        )
+        self.assertEqual(save_response.status_code, 200)
+        history = NoteHistory.objects.get(note=note)
+        self.assertEqual(history.content, "first")
+
+        restore_response = self.client.post(
+            reverse("note_history", kwargs={"slug": note.slug}),
+            data=json.dumps({"history_id": history.id}),
+            content_type="application/json",
+        )
+
+        note.refresh_from_db()
+        self.assertEqual(restore_response.status_code, 200)
+        self.assertEqual(note.content, "first")
+        self.assertEqual(restore_response.json()["content"], "first")
+
+    def test_history_only_returns_last_hour(self):
+        note = Note.objects.create(slug="sample", content="current")
+        old_history = NoteHistory.objects.create(note=note, content="old")
+        old_history.created_at = timezone.now() - timedelta(hours=1, seconds=1)
+        old_history.save(update_fields=["created_at"])
+        recent_history = NoteHistory.objects.create(note=note, content="recent")
+
+        response = self.client.get(reverse("note_history", kwargs={"slug": note.slug}))
+
+        self.assertEqual(response.status_code, 200)
+        history_ids = [item["id"] for item in response.json()["history"]]
+        self.assertIn(recent_history.id, history_ids)
+        self.assertNotIn(old_history.id, history_ids)
+
+    def test_history_snapshots_are_throttled(self):
+        note = Note.objects.create(slug="sample", content="first")
+
+        first_response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"content": "second"}),
+            content_type="application/json",
+        )
+        note.refresh_from_db()
+        second_response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"content": "third"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(NoteHistory.objects.filter(note=note).count(), 1)
+
+    def test_api_post_accepts_content_at_line_limit(self):
+        note = Note.objects.create(slug="sample")
+        content = "\n".join(f"line {index}" for index in range(MAX_NOTE_LINES))
+
+        response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"content": content}),
+            content_type="application/json",
+        )
+
+        note.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(note.content, content)
+
+    def test_api_post_rejects_content_over_line_limit(self):
+        note = Note.objects.create(slug="sample", content="original")
+        content = "\n".join(
+            f"line {index}" for index in range(MAX_NOTE_LINES + 1)
+        )
+
+        response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"content": content}),
+            content_type="application/json",
+        )
+
+        note.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(note.content, "original")
 
     def test_api_post_does_not_write_unchanged_content(self):
         note = Note.objects.create(slug="sample", content="same")
