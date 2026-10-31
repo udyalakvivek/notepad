@@ -1,4 +1,3 @@
-import json
 import re
 import secrets
 import string
@@ -16,6 +15,7 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view, authentication_classes
+from rest_framework.exceptions import ParseError
 from rest_framework.response import Response
 from .models import Note, NoteHistory
 from .utils import upload_to_s3, delete_from_s3, get_s3_file, upload_s3
@@ -191,6 +191,7 @@ def note_payload(note, changed=None):
         "content": note.content,
         "text_color": note.text_color,
         "text_weight": note.text_weight,
+        "text_font": note.text_font,
         "updated_at": note.updated_at.isoformat(),
         "attachment": attachment_payload(note),
         "has_password": bool(note.password),
@@ -243,8 +244,8 @@ def note_api(request, slug):
         return Response(note_payload(note))
 
     try:
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        payload = request.data
+    except ParseError:
         return Response(
             {"error": "Invalid JSON body."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -292,6 +293,15 @@ def note_api(request, slug):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    text_font = payload.get("text_font", note.text_font)
+    if not isinstance(text_font, str) or text_font not in dict(
+        Note.TEXT_FONT_CHOICES
+    ):
+        return Response(
+            {"error": "Choose a valid text font."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     line_count = content.count("\n") + 1 if content else 0
     if line_count > MAX_NOTE_LINES:
         return Response(
@@ -301,7 +311,11 @@ def note_api(request, slug):
 
     content_changed = content != note.content
     title_changed = title != note.title
-    style_changed = text_color != note.text_color or text_weight != note.text_weight
+    style_changed = (
+        text_color != note.text_color
+        or text_weight != note.text_weight
+        or text_font != note.text_font
+    )
     if content_changed:
         create_history_snapshot(note)
 
@@ -310,12 +324,14 @@ def note_api(request, slug):
         note.title = title
         note.text_color = text_color
         note.text_weight = text_weight
+        note.text_font = text_font
         note.save(
             update_fields=[
                 "content",
                 "title",
                 "text_color",
                 "text_weight",
+                "text_font",
                 "updated_at",
             ]
         )
@@ -430,8 +446,8 @@ def download_note_file(request, slug):
 def note_unlock(request, slug):
     note = get_note_for_slug(slug)
     try:
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        payload = request.data
+    except ParseError:
         return Response(
             {"error": "Invalid JSON body."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -474,8 +490,8 @@ def note_password(request, slug):
         return Response({"has_password": False})
 
     try:
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        payload = request.data
+    except ParseError:
         return Response(
             {"error": "Invalid JSON body."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -518,8 +534,8 @@ def note_history(request, slug):
         return Response({"history": [history_payload(item) for item in histories]})
 
     try:
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        payload = request.data
+    except ParseError:
         return Response(
             {"error": "Invalid JSON body."},
             status=status.HTTP_400_BAD_REQUEST,

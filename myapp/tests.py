@@ -96,6 +96,7 @@ class NoteViewsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["content"], "latest")
+        self.assertEqual(response.json()["text_font"], "monospace")
 
     def test_api_post_updates_content(self):
         note = Note.objects.create(slug="sample")
@@ -134,6 +135,7 @@ class NoteViewsTests(TestCase):
                 "content": "Styled note",
                 "text_color": "#2563eb",
                 "text_weight": 700,
+                "text_font": "serif",
             }),
             content_type="application/json",
         )
@@ -142,7 +144,9 @@ class NoteViewsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(note.text_color, "#2563eb")
         self.assertEqual(note.text_weight, 700)
+        self.assertEqual(note.text_font, "serif")
         self.assertEqual(response.json()["text_weight"], 700)
+        self.assertEqual(response.json()["text_font"], "serif")
 
     def test_content_only_save_keeps_existing_text_style(self):
         note = Note.objects.create(
@@ -150,6 +154,7 @@ class NoteViewsTests(TestCase):
             content="Before",
             text_color="#16a34a",
             text_weight=700,
+            text_font="serif",
         )
 
         self.client.post(
@@ -161,17 +166,34 @@ class NoteViewsTests(TestCase):
         note.refresh_from_db()
         self.assertEqual(note.text_color, "#16a34a")
         self.assertEqual(note.text_weight, 700)
+        self.assertEqual(note.text_font, "serif")
 
     def test_api_rejects_invalid_text_style(self):
         note = Note.objects.create(slug="sample")
 
         response = self.client.post(
             reverse("note_api", kwargs={"slug": note.slug}),
-            data=json.dumps({"text_color": "javascript:red", "text_weight": 900}),
+            data=json.dumps({
+                "text_color": "javascript:red",
+                "text_weight": 900,
+                "text_font": "comic-sans",
+            }),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 400)
+
+    def test_api_rejects_invalid_text_font(self):
+        note = Note.objects.create(slug="sample")
+
+        response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"text_font": "comic-sans"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "Choose a valid text font."})
 
     def test_password_is_saved_plaintext_and_locks_api(self):
         note = Note.objects.create(slug="sample", content="secret")
@@ -339,6 +361,26 @@ class NoteViewsTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+    def test_json_endpoints_return_400_for_malformed_json(self):
+        note = Note.objects.create(slug="sample")
+        endpoint_names = [
+            "note_api",
+            "note_unlock",
+            "note_password",
+            "note_history",
+        ]
+
+        for endpoint_name in endpoint_names:
+            with self.subTest(endpoint=endpoint_name):
+                response = self.client.post(
+                    reverse(endpoint_name, kwargs={"slug": note.slug}),
+                    data="{invalid json",
+                    content_type="application/json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json(), {"error": "Invalid JSON body."})
 
     def test_api_post_requires_csrf_token(self):
         note = Note.objects.create(slug="sample")

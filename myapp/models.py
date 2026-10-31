@@ -10,11 +10,22 @@ def attachment_upload_path(instance, filename):
 
 
 class Note(models.Model):
+    TEXT_FONT_CHOICES = [
+        ("sans-serif", "Sans serif"),
+        ("serif", "Serif"),
+        ("monospace", "Monospace"),
+    ]
+
     slug = models.CharField(max_length=20, unique=True)
     title = models.CharField(max_length=120, blank=True)
     content = models.TextField(blank=True)
     text_color = models.CharField(max_length=7, default="default")
     text_weight = models.PositiveSmallIntegerField(default=400)
+    text_font = models.CharField(
+        max_length=12,
+        choices=TEXT_FONT_CHOICES,
+        default="monospace",
+    )
     password = models.CharField(max_length=128, blank=True)
     attachment = models.FileField(upload_to=attachment_upload_path, blank=True)
     attachment_name = models.CharField(max_length=255, blank=True)

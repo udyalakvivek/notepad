@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-note-font="{{ note.text_font }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,12 +8,12 @@
     <title>Note {{ note.slug }}</title>
     <script>
         const savedTheme = localStorage.getItem("note-theme");
-        const availableThemes = ["dark", "light", "telegram", "ivory", "graphite", "oxford"];
+        const availableThemes = ["dark", "light", "telegram", "ivory", "graphite", "oxford", "purple-haze", "charcoal"];
         document.documentElement.dataset.theme = availableThemes.includes(savedTheme)
             ? savedTheme
             : "dark";
     </script>
-    <link rel="stylesheet" href="{% static 'myapp/note.css' %}?v=20260906-4">
+    <link rel="stylesheet" href="{% static 'myapp/note.css' %}?v=20261101-1">
 </head>
 <body>
     <div class="ambient-glow ambient-glow-one" aria-hidden="true"></div>
@@ -80,6 +80,12 @@
                                 <button type="button" data-text-weight="500" aria-pressed="false"><span> A </span>Medium</button>
                                 <button type="button" data-text-weight="700" aria-pressed="false"><span> A </span>Bold</button>
                             </div>
+                            <span class="style-label">Font</span>
+                            <div class="text-font-options" role="group" aria-label="Writing font">
+                                <button class="is-active" type="button" data-text-font="monospace" aria-pressed="true">Monospace</button>
+                                <button type="button" data-text-font="sans-serif" aria-pressed="false">Sans serif</button>
+                                <button type="button" data-text-font="serif" aria-pressed="false">Serif</button>
+                            </div>
                             <button id="title-case" class="action-button title-case-button" type="button">Title Case</button>
                             <small>Capitalize Every Word</small>
                         </div>
@@ -111,27 +117,35 @@
                     <nav class="sidebar-rail" aria-label="Tool sections">
                         <button class="rail-button is-active" type="button" data-editor-focus aria-label="Editor" title="Editor">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m14.8 6.2 3 3"/></svg>
+                            <span>Editor</span>
                         </button>
                         <button class="rail-button" type="button" data-tool-target="note-tools" aria-label="Note link" title="Note link">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/></svg>
+                            <span>Note link</span>
                         </button>
                         <button class="rail-button" type="button" data-tool-target="security-tools" aria-label="Security" title="Security">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                            <span>Security</span>
                         </button>
                         <button class="rail-button" type="button" data-tool-target="history-tools" aria-label="History" title="History">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+                            <span>History</span>
                         </button>
                         <button class="rail-button" type="button" data-tool-target="replace-tools" aria-label="Replace" title="Replace">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M4 17h10M16 5l3 2-3 2M16 15l3 2-3 2"/></svg>
+                            <span>Replace</span>
                         </button>
                         <button class="rail-button style-rail-button" type="button" data-tool-target="style-tools" aria-label="Text style" title="Text style">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m14.8 6.2 3 3"/></svg>
+                            <span>Text style</span>
                         </button>
                         <button class="rail-button" type="button" data-tool-target="file-tools" aria-label="Files" title="Files">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M13 2v7h7"/></svg>
+                            <span>Files</span>
                         </button>
                         <button class="rail-button" type="button" data-tool-target="appearance-tools" aria-label="Appearance" title="Appearance">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z"/></svg>
+                            <span>Appearance</span>
                         </button>
                     </nav>
 
@@ -252,6 +266,8 @@
                                 <button type="button" data-theme-option="ivory"><span class="theme-swatch ivory-swatch"></span>Ivory</button>
                                 <button type="button" data-theme-option="graphite"><span class="theme-swatch graphite-swatch"></span>Graphite</button>
                                 <button type="button" data-theme-option="oxford"><span class="theme-swatch oxford-swatch"></span>Oxford</button>
+                                <button type="button" data-theme-option="purple-haze"><span class="theme-swatch purple-haze-swatch"></span>Purple Haze</button>
+                                <button type="button" data-theme-option="charcoal"><span class="theme-swatch charcoal-swatch"></span>Charcoal</button>
                             </div>
                         </section>
                     </div>

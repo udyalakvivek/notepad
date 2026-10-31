@@ -59,6 +59,7 @@
     const textColorButtons = document.querySelectorAll("[data-text-color]");
     const customTextColor = document.getElementById("custom-text-color");
     const textWeightButtons = document.querySelectorAll("[data-text-weight]");
+    const textFontButtons = document.querySelectorAll("[data-text-font]");
     const titleCaseButton = document.getElementById("title-case");
     const undoToast = document.getElementById("undo-toast");
     const undoMessage = document.getElementById("undo-message");
@@ -92,6 +93,8 @@
         ivory: "Ivory Ledger",
         graphite: "Graphite Desk",
         oxford: "Oxford Navy",
+        "purple-haze": "Purple Haze",
+        charcoal: "Charcoal",
     };
 
     let noteLocked = editor.dataset.locked === "true";
@@ -100,8 +103,10 @@
     let lastSavedTitle = noteTitle.value.trim();
     let textColor = editor.dataset.textColor;
     let textWeight = editor.dataset.textWeight;
+    let textFont = root.dataset.noteFont;
     let lastSavedTextColor = textColor;
     let lastSavedTextWeight = textWeight;
+    let lastSavedTextFont = textFont;
     let lastSavedAt = editor.dataset.updatedAt ? new Date(editor.dataset.updatedAt) : null;
     let saveInProgress = false;
     let activeSavePromise = null;
@@ -139,7 +144,8 @@
         return editor.value !== lastSavedContent
             || noteTitle.value.trim() !== lastSavedTitle
             || textColor !== lastSavedTextColor
-            || textWeight !== lastSavedTextWeight;
+            || textWeight !== lastSavedTextWeight
+            || textFont !== lastSavedTextFont;
     }
 
     function updatePageTitle() {
@@ -238,6 +244,7 @@
             content: editor.value,
             textColor,
             textWeight,
+            textFont,
             savedAt: Date.now(),
         }));
     }
@@ -254,17 +261,19 @@
             const draftTitle = typeof draft.title === "string" ? draft.title : noteTitle.value;
             const draftColor = draft.textColor || textColor;
             const draftWeight = draft.textWeight || textWeight;
+            const draftFont = draft.textFont || textFont;
             if (
                 draft.content === lastSavedContent
                 && draftTitle.trim() === lastSavedTitle
                 && draftColor === lastSavedTextColor
                 && draftWeight === lastSavedTextWeight
+                && draftFont === lastSavedTextFont
             ) {
                 return;
             }
             editor.value = typeof draft.content === "string" ? draft.content : editor.value;
             noteTitle.value = draftTitle;
-            setTextStyle(draftColor, draftWeight, false);
+            setTextStyle(draftColor, draftWeight, false, draftFont);
             pendingOfflineSave = true;
             setStatus("Draft recovered", "saving");
             updateCounts();
@@ -531,9 +540,11 @@
         return window.matchMedia("(max-width: 1100px)").matches;
     }
 
-    function setTextStyle(color, weight, shouldSave = true) {
+    function setTextStyle(color, weight, shouldSave = true, font = textFont) {
         textColor = color;
         textWeight = String(weight);
+        textFont = font;
+        root.dataset.noteFont = font;
         editor.dataset.textColor = color;
         editor.style.setProperty("--note-text-color", color === "default" ? "var(--text)" : color);
         editor.style.fontWeight = textWeight;
@@ -550,6 +561,11 @@
         }
         textWeightButtons.forEach((button) => {
             const selected = button.dataset.textWeight === textWeight;
+            button.classList.toggle("is-active", selected);
+            button.setAttribute("aria-pressed", String(selected));
+        });
+        textFontButtons.forEach((button) => {
+            const selected = button.dataset.textFont === textFont;
             button.classList.toggle("is-active", selected);
             button.setAttribute("aria-pressed", String(selected));
         });
@@ -753,6 +769,7 @@
         if (titleToSave !== lastSavedTitle) savePayload.title = titleToSave;
         if (colorToSave !== lastSavedTextColor) savePayload.text_color = colorToSave;
         if (String(weightToSave) !== lastSavedTextWeight) savePayload.text_weight = weightToSave;
+        if (textFont !== lastSavedTextFont) savePayload.text_font = textFont;
         saveInProgress = true;
         setStatus("Saving...", "saving");
 
@@ -771,11 +788,16 @@
                 lastSavedTitle = data.title;
                 lastSavedTextColor = data.text_color;
                 lastSavedTextWeight = String(data.text_weight);
+                lastSavedTextFont = data.text_font;
                 if (noteTitle.value.trim() === titleToSave) {
                     noteTitle.value = data.title;
                 }
-                if (textColor === colorToSave && textWeight === String(weightToSave)) {
-                    setTextStyle(data.text_color, String(data.text_weight), false);
+                if (
+                    textColor === colorToSave
+                    && textWeight === String(weightToSave)
+                    && textFont === data.text_font
+                ) {
+                    setTextStyle(data.text_color, String(data.text_weight), false, data.text_font);
                 }
                 updatePageTitle();
                 if (hasUnsavedChanges()) {
@@ -843,10 +865,12 @@
             if (
                 data.text_color !== lastSavedTextColor
                 || String(data.text_weight) !== lastSavedTextWeight
+                || data.text_font !== lastSavedTextFont
             ) {
                 lastSavedTextColor = data.text_color;
                 lastSavedTextWeight = String(data.text_weight);
-                setTextStyle(lastSavedTextColor, lastSavedTextWeight, false);
+                lastSavedTextFont = data.text_font;
+                setTextStyle(lastSavedTextColor, lastSavedTextWeight, false, lastSavedTextFont);
                 remoteChanged = true;
             }
             if (remoteChanged) {
@@ -1069,6 +1093,12 @@
         });
     });
 
+    textFontButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setTextStyle(textColor, textWeight, true, button.dataset.textFont);
+        });
+    });
+
     titleCaseButton.addEventListener("click", applyTitleCase);
 
     undoAction.addEventListener("click", () => {
@@ -1259,7 +1289,8 @@
             lastSavedTitle = data.title || "";
             lastSavedTextColor = data.text_color;
             lastSavedTextWeight = String(data.text_weight);
-            setTextStyle(lastSavedTextColor, lastSavedTextWeight, false);
+            lastSavedTextFont = data.text_font;
+            setTextStyle(lastSavedTextColor, lastSavedTextWeight, false, lastSavedTextFont);
             updatePageTitle();
             editor.value = data.content;
             lastSavedContent = data.content;
@@ -1472,6 +1503,7 @@
         if (noteTitle.value.trim() !== lastSavedTitle) savePayload.title = noteTitle.value.trim();
         if (textColor !== lastSavedTextColor) savePayload.text_color = textColor;
         if (textWeight !== lastSavedTextWeight) savePayload.text_weight = Number(textWeight);
+        if (textFont !== lastSavedTextFont) savePayload.text_font = textFont;
         fetch(apiUrl, {
             method: "POST",
             headers: {
@@ -1498,7 +1530,7 @@
     updateLockState();
     setToolsOpen(false);
     updateThemeControls();
-    setTextStyle(textColor, textWeight, false);
+    setTextStyle(textColor, textWeight, false, textFont);
     restoreLegacyTextStyle();
     syncTextStylePanel();
     updateMobileTabFade();
