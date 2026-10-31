@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -7,8 +9,18 @@ SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "django-insecure-development-only-change-me",
 )
+
+load_dotenv()
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION")
+AWS_S3_ENDPOINT_URL = os.getenv("AWS_ENDPOINT_URL")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+
 # DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
-DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+# DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+DEBUG = True
 DEFAULT_ALLOWED_HOSTS = [
     "notepad.meon.co.in",
     "192.168.29.101",
@@ -40,6 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
     "myapp",
 ]
 

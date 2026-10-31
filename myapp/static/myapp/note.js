@@ -31,6 +31,43 @@
     const lineCountWrap = document.getElementById("line-count-wrap");
     const wordCount = document.getElementById("word-count");
     const characterCount = document.getElementById("character-count");
+    const toolsSidebar = document.getElementById("tools-sidebar");
+    const toolsToggle = document.getElementById("tools-toggle");
+    const sidebarClose = document.getElementById("sidebar-close");
+    const sidebarScrim = document.getElementById("sidebar-scrim");
+    const toolTargetButtons = document.querySelectorAll("[data-tool-target]");
+    const editorFocusButtons = document.querySelectorAll("[data-editor-focus]");
+    const searchFocusButtons = document.querySelectorAll("[data-search-focus]");
+    const copyNoteButtons = document.querySelectorAll("[data-copy-note]");
+    const openToolsButtons = document.querySelectorAll("[data-open-tools]");
+    const attachFileButtons = document.querySelectorAll("[data-attach-file]");
+    const themeOptionButtons = document.querySelectorAll("[data-theme-option]");
+    const sidebarSections = document.querySelectorAll(".sidebar-section");
+    const mobileToolTabs = document.querySelector(".mobile-tool-tabs");
+    const noteTitle = document.getElementById("note-title");
+    const replaceToggle = document.getElementById("replace-toggle");
+    const replaceFindInput = document.getElementById("replace-find-input");
+    const replaceInput = document.getElementById("replace-input");
+    const replaceMatchButtons = document.querySelectorAll("[data-replace-match]");
+    const replaceCount = document.getElementById("replace-count");
+    const replaceAllButton = document.getElementById("replace-all");
+    const replaceResult = document.getElementById("replace-result");
+    const textStyleMenu = document.getElementById("text-style-menu");
+    const textStyleToggle = document.getElementById("text-style-toggle");
+    const textStylePanel = document.getElementById("text-style-panel");
+    const mobileStyleSlot = document.getElementById("mobile-style-slot");
+    const textColorButtons = document.querySelectorAll("[data-text-color]");
+    const customTextColor = document.getElementById("custom-text-color");
+    const textWeightButtons = document.querySelectorAll("[data-text-weight]");
+    const titleCaseButton = document.getElementById("title-case");
+    const undoToast = document.getElementById("undo-toast");
+    const undoMessage = document.getElementById("undo-message");
+    const undoAction = document.getElementById("undo-action");
+    const recentNotes = document.getElementById("recent-notes");
+    const historyDetail = document.getElementById("history-detail");
+    const historyChangeSummary = document.getElementById("history-change-summary");
+    const historyTime = document.getElementById("history-time");
+    const historyContent = document.getElementById("history-content");
     const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
     const apiUrl = editor.dataset.apiUrl;
     const fileUrl = editor.dataset.fileUrl;
@@ -43,11 +80,28 @@
     const WARM_REFRESH_MS = 30000;
     const IDLE_REFRESH_MS = 60000;
     const LONG_IDLE_REFRESH_MS = 5 * 60 * 1000;
-    const MAX_NOTE_LINES = 2000;
+    const MAX_NOTE_LINES = 5000;
+    const noteSlug = slugSelect.dataset.currentSlug;
+    const draftKey = `notepad-draft:${noteSlug}`;
+    const legacyTextStyleKey = `notepad-text-style:${noteSlug}`;
+    const recentNotesKey = "notepad-recent-notes";
+    const THEME_LABELS = {
+        dark: "Dark",
+        light: "Light",
+        telegram: "Glass",
+        ivory: "Ivory Ledger",
+        graphite: "Graphite Desk",
+        oxford: "Oxford Navy",
+    };
 
     let noteLocked = editor.dataset.locked === "true";
     let hasPassword = editor.dataset.hasPassword === "true";
     let lastSavedContent = editor.value;
+    let lastSavedTitle = noteTitle.value.trim();
+    let textColor = editor.dataset.textColor;
+    let textWeight = editor.dataset.textWeight;
+    let lastSavedTextColor = textColor;
+    let lastSavedTextWeight = textWeight;
     let lastSavedAt = editor.dataset.updatedAt ? new Date(editor.dataset.updatedAt) : null;
     let saveInProgress = false;
     let activeSavePromise = null;
@@ -57,11 +111,39 @@
     let pendingOfflineSave = false;
     let lastActivityAt = Date.now();
     let searchMatches = [];
+    let replaceMatches = [];
+    let replaceMatchMode = "characters";
+    let highlightMode = "search";
     let activeMatchIndex = -1;
+    let currentToolTarget = "note-tools";
+    let historyItems = [];
+    let undoSnapshot = null;
+    let undoTimer = null;
+    let wasCompactToolsLayout = window.matchMedia("(max-width: 1100px)").matches;
 
     function setStatus(label, state) {
         status.textContent = label;
         status.dataset.state = state;
+    }
+
+    function updateThemeControls() {
+        const themeName = THEME_LABELS[root.dataset.theme] || THEME_LABELS.dark;
+        themeButton.title = `Choose theme (${themeName})`;
+        themeButton.setAttribute("aria-label", `Choose theme. Current theme: ${themeName}`);
+        themeOptionButtons.forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.themeOption === root.dataset.theme);
+        });
+    }
+
+    function hasUnsavedChanges() {
+        return editor.value !== lastSavedContent
+            || noteTitle.value.trim() !== lastSavedTitle
+            || textColor !== lastSavedTextColor
+            || textWeight !== lastSavedTextWeight;
+    }
+
+    function updatePageTitle() {
+        document.title = noteTitle.value.trim() || `Note ${noteSlug}`;
     }
 
     function savedLabel() {
@@ -98,6 +180,7 @@
 
     function updateLockState() {
         editor.disabled = noteLocked;
+        noteTitle.disabled = noteLocked;
         editorForm.classList.toggle("is-locked", noteLocked);
         lockPanel.hidden = !noteLocked;
         searchInput.disabled = noteLocked;
@@ -108,6 +191,16 @@
         clearPasswordButton.hidden = !hasPassword || noteLocked;
         historySelect.disabled = noteLocked;
         restoreHistoryButton.disabled = noteLocked || !historySelect.value;
+        replaceFindInput.disabled = noteLocked;
+        replaceInput.disabled = noteLocked;
+        replaceMatchButtons.forEach((button) => {
+            button.disabled = noteLocked;
+        });
+        replaceAllButton.disabled = noteLocked;
+        titleCaseButton.disabled = noteLocked;
+        attachFileButtons.forEach((button) => {
+            button.disabled = noteLocked;
+        });
         if (noteLocked) {
             setStatus("Locked", "error");
             unlockPassword.focus();
@@ -137,6 +230,122 @@
         lineCountWrap.classList.toggle("is-warning", lines >= MAX_NOTE_LINES);
         wordCount.textContent = words;
         characterCount.textContent = content.length;
+    }
+
+    function saveLocalDraft() {
+        localStorage.setItem(draftKey, JSON.stringify({
+            title: noteTitle.value,
+            content: editor.value,
+            textColor,
+            textWeight,
+            savedAt: Date.now(),
+        }));
+    }
+
+    function restoreLocalDraft() {
+        if (noteLocked) {
+            return;
+        }
+        try {
+            const draft = JSON.parse(localStorage.getItem(draftKey));
+            if (!draft) {
+                return;
+            }
+            const draftTitle = typeof draft.title === "string" ? draft.title : noteTitle.value;
+            const draftColor = draft.textColor || textColor;
+            const draftWeight = draft.textWeight || textWeight;
+            if (
+                draft.content === lastSavedContent
+                && draftTitle.trim() === lastSavedTitle
+                && draftColor === lastSavedTextColor
+                && draftWeight === lastSavedTextWeight
+            ) {
+                return;
+            }
+            editor.value = typeof draft.content === "string" ? draft.content : editor.value;
+            noteTitle.value = draftTitle;
+            setTextStyle(draftColor, draftWeight, false);
+            pendingOfflineSave = true;
+            setStatus("Draft recovered", "saving");
+            updateCounts();
+            updateSearchMatches();
+            updateReplaceMatches();
+            scheduleSave();
+        } catch (error) {
+            localStorage.removeItem(draftKey);
+        }
+    }
+
+    function renderRecentNotes() {
+        recentNotes.replaceChildren();
+        let items = [];
+        try {
+            items = JSON.parse(localStorage.getItem(recentNotesKey)) || [];
+        } catch (error) {
+            localStorage.removeItem(recentNotesKey);
+        }
+
+        if (!items.length) {
+            const empty = document.createElement("span");
+            empty.className = "recent-notes-empty";
+            empty.textContent = "No recent notes yet";
+            recentNotes.append(empty);
+            return;
+        }
+
+        items.slice(0, 6).forEach((item) => {
+            const link = document.createElement("a");
+            link.className = "recent-note-link";
+            link.href = `/${encodeURIComponent(item.slug)}/`;
+            const title = document.createElement("span");
+            const slug = document.createElement("small");
+            title.textContent = item.title || "Untitled note";
+            slug.textContent = item.slug;
+            link.append(title, slug);
+            recentNotes.append(link);
+        });
+    }
+
+    function rememberCurrentNote() {
+        let items = [];
+        try {
+            items = JSON.parse(localStorage.getItem(recentNotesKey)) || [];
+        } catch (error) {
+            items = [];
+        }
+        items = items.filter((item) => item.slug !== noteSlug);
+        items.unshift({slug: noteSlug, title: noteTitle.value.trim(), openedAt: Date.now()});
+        localStorage.setItem(recentNotesKey, JSON.stringify(items.slice(0, 6)));
+        renderRecentNotes();
+    }
+
+    function replaceEveryMatch() {
+        const expression = replaceExpression();
+        if (!expression) {
+            replaceResult.textContent = "Enter text to find.";
+            replaceFindInput.focus();
+            return;
+        }
+        const matches = editor.value.match(expression);
+        if (!matches) {
+            replaceResult.textContent = "No matches found.";
+            return;
+        }
+
+        rememberUndo(`Replaced ${matches.length} ${matches.length === 1 ? "match" : "matches"}`);
+        editor.value = editor.value.replace(expression, () => replaceInput.value);
+        editor.dispatchEvent(new Event("input", {bubbles: true}));
+        replaceResult.textContent = `Replaced ${matches.length} ${matches.length === 1 ? "match" : "matches"}.`;
+    }
+
+    function replaceExpression() {
+        if (!replaceFindInput.value) {
+            return null;
+        }
+        const escapedQuery = replaceFindInput.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const wholeWord = `(?<![\\p{L}\\p{N}_])${escapedQuery}(?![\\p{L}\\p{N}_])`;
+        const pattern = replaceMatchMode === "word" ? wholeWord : escapedQuery;
+        return new RegExp(pattern, "giu");
     }
 
     function trimToMaxLines(value) {
@@ -198,17 +407,31 @@
         renderSearchHighlights();
     }
 
+    function updateReplaceMatches() {
+        const expression = replaceExpression();
+        replaceMatches = expression
+            ? [...editor.value.matchAll(expression)].map((match) => match.index)
+            : [];
+        replaceCount.textContent = `${replaceMatches.length} ${replaceMatches.length === 1 ? "match" : "matches"}`;
+        replaceResult.textContent = "";
+        renderSearchHighlights();
+    }
+
     function renderSearchHighlights() {
         searchHighlights.replaceChildren();
 
-        if (!searchInput.value || !searchMatches.length) {
+        const showingReplace = highlightMode === "replace";
+        const query = showingReplace ? replaceFindInput.value : searchInput.value;
+        const matches = showingReplace ? replaceMatches : searchMatches;
+
+        if (!query || !matches.length) {
             searchHighlights.textContent = editor.value;
             syncHighlightScroll();
             return;
         }
 
         let cursor = 0;
-        searchMatches.forEach((start, index) => {
+        matches.forEach((start, index) => {
             searchHighlights.append(
                 document.createTextNode(editor.value.slice(cursor, start)),
             );
@@ -216,13 +439,15 @@
             const mark = document.createElement("mark");
             mark.textContent = editor.value.slice(
                 start,
-                start + searchInput.value.length,
+                start + query.length,
             );
-            if (index === activeMatchIndex) {
+            if (showingReplace) {
+                mark.classList.add("is-replace-match");
+            } else if (index === activeMatchIndex) {
                 mark.classList.add("is-active");
             }
             searchHighlights.append(mark);
-            cursor = start + searchInput.value.length;
+            cursor = start + query.length;
         });
         searchHighlights.append(
             document.createTextNode(editor.value.slice(cursor)),
@@ -268,6 +493,9 @@
     function renderAttachment(attachment) {
         const hasAttachment = Boolean(attachment);
         attachLabel.hidden = hasAttachment;
+        attachFileButtons.forEach((button) => {
+            button.hidden = hasAttachment;
+        });
         fileActions.hidden = !hasAttachment;
 
         if (!hasAttachment) {
@@ -289,7 +517,7 @@
         window.clearTimeout(saveTimer);
         saveTimer = null;
 
-        if (noteLocked || editor.value === lastSavedContent) {
+        if (noteLocked || !hasUnsavedChanges()) {
             return;
         }
 
@@ -297,6 +525,156 @@
             saveTimer = null;
             saveIfChanged();
         }, SAVE_DELAY_MS);
+    }
+
+    function compactToolsLayout() {
+        return window.matchMedia("(max-width: 1100px)").matches;
+    }
+
+    function setTextStyle(color, weight, shouldSave = true) {
+        textColor = color;
+        textWeight = String(weight);
+        editor.dataset.textColor = color;
+        editor.style.setProperty("--note-text-color", color === "default" ? "var(--text)" : color);
+        editor.style.fontWeight = textWeight;
+
+        let presetColor = false;
+        textColorButtons.forEach((button) => {
+            const selected = button.dataset.textColor === color;
+            button.classList.toggle("is-active", selected);
+            presetColor ||= selected;
+        });
+        customTextColor.parentElement.classList.toggle("is-active", !presetColor);
+        if (!presetColor && /^#[0-9a-f]{6}$/i.test(color)) {
+            customTextColor.value = color;
+        }
+        textWeightButtons.forEach((button) => {
+            const selected = button.dataset.textWeight === textWeight;
+            button.classList.toggle("is-active", selected);
+            button.setAttribute("aria-pressed", String(selected));
+        });
+        if (shouldSave && hasUnsavedChanges()) {
+            markActivity();
+            saveLocalDraft();
+            setStatus("Saving style...", "saving");
+            scheduleSave();
+            saveIfChanged();
+        } else if (shouldSave) {
+            localStorage.removeItem(draftKey);
+            showSaved();
+        }
+    }
+
+    function syncTextStylePanel() {
+        if (compactToolsLayout()) {
+            mobileStyleSlot.append(textStylePanel);
+            textStylePanel.hidden = false;
+            return;
+        }
+        textStyleMenu.append(textStylePanel);
+        textStylePanel.hidden = true;
+        textStyleToggle.setAttribute("aria-expanded", "false");
+    }
+
+    function restoreLegacyTextStyle() {
+        const savedStyle = localStorage.getItem(legacyTextStyleKey);
+        if (!savedStyle || textColor !== "default" || textWeight !== "400") {
+            localStorage.removeItem(legacyTextStyleKey);
+            return;
+        }
+        try {
+            const style = JSON.parse(savedStyle);
+            const validColor = style.color === "default" || /^#[0-9a-f]{6}$/i.test(style.color);
+            const validWeight = ["400", "500", "700"].includes(String(style.weight));
+            if (validColor && validWeight) {
+                setTextStyle(style.color, String(style.weight));
+            }
+        } catch (error) {
+            console.warn("Ignoring an invalid saved text style.");
+        } finally {
+            localStorage.removeItem(legacyTextStyleKey);
+        }
+    }
+
+    function applyTitleCase() {
+        let start = editor.selectionStart;
+        let end = editor.selectionEnd;
+
+        if (start === end) {
+            start = editor.value.lastIndexOf("\n", start - 1) + 1;
+            const lineEnd = editor.value.indexOf("\n", end);
+            end = lineEnd === -1 ? editor.value.length : lineEnd;
+        }
+
+        const title = editor.value.slice(start, end).replace(
+            /\p{L}[\p{L}\p{M}\p{N}'’_-]*/gu,
+            (word) => word[0].toLocaleUpperCase() + word.slice(1),
+        );
+        if (title === editor.value.slice(start, end)) {
+            return;
+        }
+        rememberUndo("Changed to Title Case");
+        editor.setRangeText(title, start, end, "select");
+        editor.dispatchEvent(new Event("input", {bubbles: true}));
+        editor.focus();
+    }
+
+    function rememberUndo(message) {
+        window.clearTimeout(undoTimer);
+        undoSnapshot = {
+            content: editor.value,
+            selectionStart: editor.selectionStart,
+            selectionEnd: editor.selectionEnd,
+        };
+        undoMessage.textContent = message;
+        undoToast.hidden = false;
+        undoTimer = window.setTimeout(hideUndo, 10000);
+    }
+
+    function hideUndo() {
+        undoToast.hidden = true;
+        undoSnapshot = null;
+        undoTimer = null;
+    }
+
+    function updateMobileTabFade() {
+        const maxScroll = mobileToolTabs.scrollWidth - mobileToolTabs.clientWidth;
+        mobileToolTabs.classList.toggle("is-at-start", mobileToolTabs.scrollLeft < 2);
+        mobileToolTabs.classList.toggle("is-at-end", mobileToolTabs.scrollLeft > maxScroll - 2);
+    }
+
+    function setToolsOpen(open, targetId = null) {
+        const shouldOpen = Boolean(open);
+        if (targetId) {
+            currentToolTarget = targetId;
+        }
+        toolsSidebar.classList.toggle("is-open", shouldOpen);
+        toolsToggle.setAttribute("aria-expanded", String(shouldOpen));
+        toolsToggle.setAttribute("aria-label", shouldOpen ? "Hide tools" : "Show tools");
+        toolsToggle.title = shouldOpen ? "Hide tools" : "Show tools";
+
+        if (shouldOpen) {
+            toolTargetButtons.forEach((button) => {
+                button.classList.toggle("is-active", button.dataset.toolTarget === currentToolTarget);
+            });
+            editorFocusButtons.forEach((button) => button.classList.remove("is-active"));
+            sidebarSections.forEach((section) => {
+                section.classList.toggle("is-active", section.id === currentToolTarget);
+            });
+            window.requestAnimationFrame(() => {
+                document.getElementById(currentToolTarget)?.scrollIntoView({block: "start", behavior: "smooth"});
+                const activeMobileTab = mobileToolTabs.querySelector(`[data-tool-target="${currentToolTarget}"]`);
+                activeMobileTab?.scrollIntoView({block: "nearest", inline: "center", behavior: "smooth"});
+                updateMobileTabFade();
+            });
+        } else {
+            toolTargetButtons.forEach((button) => button.classList.remove("is-active"));
+            editorFocusButtons.forEach((button) => button.classList.add("is-active"));
+        }
+    }
+
+    function openToolSection(targetId) {
+        setToolsOpen(true, targetId);
     }
 
     function getRefreshDelay() {
@@ -362,11 +740,19 @@
         if (saveInProgress) {
             return activeSavePromise;
         }
-        if (editor.value === lastSavedContent) {
+        if (!hasUnsavedChanges()) {
             return true;
         }
 
         const contentToSave = editor.value;
+        const titleToSave = noteTitle.value.trim();
+        const colorToSave = textColor;
+        const weightToSave = Number(textWeight);
+        const savePayload = {};
+        if (contentToSave !== lastSavedContent) savePayload.content = contentToSave;
+        if (titleToSave !== lastSavedTitle) savePayload.title = titleToSave;
+        if (colorToSave !== lastSavedTextColor) savePayload.text_color = colorToSave;
+        if (String(weightToSave) !== lastSavedTextWeight) savePayload.text_weight = weightToSave;
         saveInProgress = true;
         setStatus("Saving...", "saving");
 
@@ -378,15 +764,31 @@
                         "Content-Type": "application/json",
                         "X-CSRFToken": csrfToken,
                     },
-                    body: JSON.stringify({content: contentToSave}),
+                    body: JSON.stringify(savePayload),
                 });
 
-                lastSavedContent = contentToSave;
+                lastSavedContent = data.content;
+                lastSavedTitle = data.title;
+                lastSavedTextColor = data.text_color;
+                lastSavedTextWeight = String(data.text_weight);
+                if (noteTitle.value.trim() === titleToSave) {
+                    noteTitle.value = data.title;
+                }
+                if (textColor === colorToSave && textWeight === String(weightToSave)) {
+                    setTextStyle(data.text_color, String(data.text_weight), false);
+                }
+                updatePageTitle();
+                if (hasUnsavedChanges()) {
+                    saveLocalDraft();
+                } else {
+                    localStorage.removeItem(draftKey);
+                }
                 renderAttachment(data.attachment);
                 showSaved(data.updated_at);
+                rememberCurrentNote();
                 scheduleRemoteRefresh(FAST_REFRESH_MS);
                 loadHistory();
-                if (editor.value !== lastSavedContent) {
+                if (hasUnsavedChanges()) {
                     setStatus("Typing...", "typing");
                 }
                 return true;
@@ -398,7 +800,7 @@
             } finally {
                 saveInProgress = false;
                 activeSavePromise = null;
-                if (editor.value !== lastSavedContent && !pendingOfflineSave) {
+                if (hasUnsavedChanges() && !pendingOfflineSave) {
                     scheduleSave();
                 }
             }
@@ -413,7 +815,7 @@
             || noteLocked
             || pollInProgress
             || saveInProgress
-            || editor.value !== lastSavedContent
+            || hasUnsavedChanges()
         ) {
             return;
         }
@@ -421,13 +823,33 @@
         pollInProgress = true;
         try {
             const data = await fetchJson(apiUrl, {cache: "no-store"});
+            let remoteChanged = false;
             if (data.content !== lastSavedContent) {
                 editor.value = data.content;
                 lastSavedContent = data.content;
-                lastSavedAt = new Date(data.updated_at);
                 lastActivityAt = Date.now();
                 updateCounts();
                 updateSearchMatches();
+                updateReplaceMatches();
+                remoteChanged = true;
+            }
+            if (data.title !== lastSavedTitle) {
+                noteTitle.value = data.title || "";
+                lastSavedTitle = data.title || "";
+                updatePageTitle();
+                rememberCurrentNote();
+                remoteChanged = true;
+            }
+            if (
+                data.text_color !== lastSavedTextColor
+                || String(data.text_weight) !== lastSavedTextWeight
+            ) {
+                lastSavedTextColor = data.text_color;
+                lastSavedTextWeight = String(data.text_weight);
+                setTextStyle(lastSavedTextColor, lastSavedTextWeight, false);
+                remoteChanged = true;
+            }
+            if (remoteChanged) {
                 showSaved(data.updated_at);
             }
             hasPassword = Boolean(data.has_password);
@@ -446,6 +868,7 @@
     }
 
     function renderHistory(items) {
+        historyItems = items;
         historySelect.replaceChildren();
         const placeholder = document.createElement("option");
         placeholder.value = "";
@@ -465,6 +888,23 @@
             historySelect.append(option);
         });
         restoreHistoryButton.disabled = noteLocked || !historySelect.value;
+        historyDetail.hidden = true;
+    }
+
+    function showHistoryDetails() {
+        const item = historyItems.find((history) => String(history.id) === historySelect.value);
+        if (!item) {
+            historyDetail.hidden = true;
+            return;
+        }
+        const previousLines = item.content.split("\n");
+        const currentLines = editor.value.split("\n");
+        const changedLines = Math.max(previousLines.length, currentLines.length)
+            - previousLines.filter((line, index) => line === currentLines[index]).length;
+        historyChangeSummary.textContent = `${changedLines} changed line${changedLines === 1 ? "" : "s"}`;
+        historyTime.textContent = new Date(item.created_at).toLocaleString();
+        historyContent.textContent = item.content || "Empty note";
+        historyDetail.hidden = false;
     }
 
     async function loadHistory() {
@@ -519,7 +959,10 @@
         const wasTrimmed = enforceLineLimit();
         updateCounts();
         updateSearchMatches();
-        if (editor.value === lastSavedContent) {
+        updateReplaceMatches();
+        saveLocalDraft();
+        if (!hasUnsavedChanges()) {
+            localStorage.removeItem(draftKey);
             window.clearTimeout(saveTimer);
             saveTimer = null;
             showSaved();
@@ -532,10 +975,29 @@
         }
     });
 
+    noteTitle.addEventListener("input", () => {
+        markActivity();
+        updatePageTitle();
+        saveLocalDraft();
+        if (hasUnsavedChanges()) {
+            setStatus("Typing...", "typing");
+            scheduleSave();
+        } else {
+            localStorage.removeItem(draftKey);
+            showSaved();
+        }
+    });
+
     editor.addEventListener("scroll", syncHighlightScroll);
 
     searchInput.addEventListener("input", () => {
+        highlightMode = "search";
         updateSearchMatches(true);
+    });
+
+    searchInput.addEventListener("focus", () => {
+        highlightMode = "search";
+        renderSearchHighlights();
     });
 
     searchInput.addEventListener("keydown", (event) => {
@@ -549,17 +1011,202 @@
         }
     });
 
+    replaceToggle.addEventListener("click", () => {
+        openToolSection("replace-tools");
+        highlightMode = "replace";
+        updateReplaceMatches();
+        window.requestAnimationFrame(() => replaceFindInput.focus());
+    });
+
+    replaceFindInput.addEventListener("input", () => {
+        highlightMode = "replace";
+        updateReplaceMatches();
+    });
+
+    replaceFindInput.addEventListener("focus", () => {
+        highlightMode = "replace";
+        renderSearchHighlights();
+    });
+
+    replaceMatchButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            replaceMatchMode = button.dataset.replaceMatch;
+            replaceMatchButtons.forEach((option) => {
+                const selected = option === button;
+                option.classList.toggle("is-active", selected);
+                option.setAttribute("aria-pressed", String(selected));
+            });
+            highlightMode = "replace";
+            updateReplaceMatches();
+        });
+    });
+
+    replaceAllButton.addEventListener("click", replaceEveryMatch);
+
+    textStyleToggle.addEventListener("click", () => {
+        if (!textStyleMenu.contains(textStylePanel)) {
+            textStyleMenu.append(textStylePanel);
+            textStylePanel.hidden = true;
+        }
+        const open = textStylePanel.hidden;
+        textStylePanel.hidden = !open;
+        textStyleToggle.setAttribute("aria-expanded", String(open));
+    });
+
+    textColorButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setTextStyle(button.dataset.textColor, textWeight);
+        });
+    });
+
+    customTextColor.addEventListener("input", () => {
+        setTextStyle(customTextColor.value, textWeight);
+    });
+
+    textWeightButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setTextStyle(textColor, button.dataset.textWeight);
+        });
+    });
+
+    titleCaseButton.addEventListener("click", applyTitleCase);
+
+    undoAction.addEventListener("click", () => {
+        if (!undoSnapshot) {
+            return;
+        }
+        const snapshot = undoSnapshot;
+        hideUndo();
+        editor.value = snapshot.content;
+        editor.dispatchEvent(new Event("input", {bubbles: true}));
+        editor.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+        editor.focus();
+    });
+
+    mobileToolTabs.addEventListener("scroll", updateMobileTabFade, {passive: true});
+
+    toolsToggle.addEventListener("click", () => {
+        setToolsOpen(!toolsSidebar.classList.contains("is-open"));
+    });
+
+    sidebarClose.addEventListener("click", () => setToolsOpen(false));
+    sidebarScrim.addEventListener("click", () => setToolsOpen(false));
+
+    toolTargetButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            openToolSection(button.dataset.toolTarget);
+            if (button.dataset.toolTarget === "replace-tools") {
+                highlightMode = "replace";
+                updateReplaceMatches();
+            }
+            if (button.dataset.toolTarget === "style-tools") {
+                mobileStyleSlot.append(textStylePanel);
+                textStylePanel.hidden = false;
+            }
+        });
+    });
+
+    editorFocusButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setToolsOpen(false);
+            window.requestAnimationFrame(() => editor.focus());
+        });
+    });
+
+    searchFocusButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setToolsOpen(false);
+            highlightMode = "search";
+            updateSearchMatches();
+            window.requestAnimationFrame(() => searchInput.focus());
+        });
+    });
+
+    copyNoteButtons.forEach((button) => {
+        button.addEventListener("click", () => copyTextButton.click());
+    });
+
+    openToolsButtons.forEach((button) => {
+        button.addEventListener("click", () => setToolsOpen(true));
+    });
+
+    attachFileButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            if (!noteLocked) {
+                fileInput.click();
+            }
+        });
+    });
+
+    themeOptionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            root.dataset.theme = button.dataset.themeOption;
+            localStorage.setItem("note-theme", root.dataset.theme);
+            updateThemeControls();
+        });
+    });
+
+    document.addEventListener("keydown", (event) => {
+        const shortcut = event.ctrlKey || event.metaKey;
+        if (shortcut && event.key.toLowerCase() === "k") {
+            event.preventDefault();
+            highlightMode = "search";
+            updateSearchMatches();
+            searchInput.focus();
+            return;
+        }
+        if (shortcut && event.shiftKey && event.key.toLowerCase() === "c") {
+            event.preventDefault();
+            copyTextButton.click();
+            return;
+        }
+        if (shortcut && event.key.toLowerCase() === "h") {
+            event.preventDefault();
+            openToolSection("history-tools");
+            return;
+        }
+        if (shortcut && event.key.toLowerCase() === "b") {
+            event.preventDefault();
+            setToolsOpen(!toolsSidebar.classList.contains("is-open"));
+            return;
+        }
+        if (event.key === "Escape" && toolsSidebar.classList.contains("is-open")) {
+            setToolsOpen(false);
+            toolsToggle.focus();
+        } else if (event.key === "Escape" && !textStylePanel.hidden) {
+            textStylePanel.hidden = true;
+            textStyleToggle.setAttribute("aria-expanded", "false");
+            textStyleToggle.focus();
+        }
+    });
+
+    document.addEventListener("click", (event) => {
+        if (
+            !compactToolsLayout()
+            && textStyleMenu.contains(textStylePanel)
+            && !textStyleMenu.contains(event.target)
+        ) {
+            textStylePanel.hidden = true;
+            textStyleToggle.setAttribute("aria-expanded", "false");
+        }
+    });
+
+    window.addEventListener("resize", () => {
+        const isCompact = compactToolsLayout();
+        if (isCompact !== wasCompactToolsLayout) {
+            setToolsOpen(false);
+            wasCompactToolsLayout = isCompact;
+            syncTextStylePanel();
+        }
+        window.requestAnimationFrame(updateMobileTabFade);
+    });
+
     passwordToggleButtons.forEach((button) => {
         button.addEventListener("click", () => togglePasswordVisibility(button));
     });
 
     themeButton.addEventListener("click", () => {
-        const themes = ["dark", "light", "telegram"];
-        const currentIndex = themes.indexOf(root.dataset.theme);
-        const theme = themes[(currentIndex + 1) % themes.length];
-        root.dataset.theme = theme;
-        localStorage.setItem("note-theme", theme);
-        themeButton.title = `Switch theme (${theme})`;
+        openToolSection("appearance-tools");
     });
 
     copyUrlButton.addEventListener("click", () => {
@@ -608,12 +1255,20 @@
             });
             noteLocked = false;
             hasPassword = Boolean(data.has_password);
+            noteTitle.value = data.title || "";
+            lastSavedTitle = data.title || "";
+            lastSavedTextColor = data.text_color;
+            lastSavedTextWeight = String(data.text_weight);
+            setTextStyle(lastSavedTextColor, lastSavedTextWeight, false);
+            updatePageTitle();
             editor.value = data.content;
             lastSavedContent = data.content;
             showSaved(data.updated_at);
             renderAttachment(data.attachment);
             updateCounts();
             updateSearchMatches(true);
+            updateReplaceMatches();
+            rememberCurrentNote();
             updateLockState();
             loadHistory();
             scheduleRemoteRefresh(FAST_REFRESH_MS);
@@ -682,11 +1337,15 @@
 
     historySelect.addEventListener("change", () => {
         restoreHistoryButton.disabled = noteLocked || !historySelect.value;
+        showHistoryDetails();
     });
 
     restoreHistoryButton.addEventListener("click", async () => {
         const historyId = historySelect.value;
         if (!historyId) {
+            return;
+        }
+        if (!window.confirm("Restore this version? Your current content will be saved in history first.")) {
             return;
         }
         restoreHistoryButton.disabled = true;
@@ -708,9 +1367,11 @@
             });
             editor.value = data.content;
             lastSavedContent = data.content;
+            localStorage.removeItem(draftKey);
             showSaved(data.updated_at);
             updateCounts();
             updateSearchMatches(true);
+            updateReplaceMatches();
             renderAttachment(data.attachment);
             renderHistory(data.history || []);
             setStatus("Restored", "saved");
@@ -783,14 +1444,14 @@
     });
 
     window.addEventListener("online", () => {
-        if (pendingOfflineSave || editor.value !== lastSavedContent) {
+        if (pendingOfflineSave || hasUnsavedChanges()) {
             setStatus("Back online", "saving");
             saveIfChanged();
         }
     });
 
     window.addEventListener("offline", () => {
-        if (editor.value !== lastSavedContent) {
+        if (hasUnsavedChanges()) {
             pendingOfflineSave = true;
             setStatus("Offline pending", "error");
         }
@@ -803,9 +1464,14 @@
     });
 
     window.addEventListener("pagehide", () => {
-        if (noteLocked || editor.value === lastSavedContent) {
+        if (noteLocked || !hasUnsavedChanges()) {
             return;
         }
+        const savePayload = {};
+        if (editor.value !== lastSavedContent) savePayload.content = editor.value;
+        if (noteTitle.value.trim() !== lastSavedTitle) savePayload.title = noteTitle.value.trim();
+        if (textColor !== lastSavedTextColor) savePayload.text_color = textColor;
+        if (textWeight !== lastSavedTextWeight) savePayload.text_weight = Number(textWeight);
         fetch(apiUrl, {
             method: "POST",
             headers: {
@@ -814,7 +1480,7 @@
             },
             credentials: "same-origin",
             keepalive: true,
-            body: JSON.stringify({content: editor.value}),
+            body: JSON.stringify(savePayload),
         }).catch(() => {});
     });
 
@@ -830,8 +1496,17 @@
     });
 
     updateLockState();
+    setToolsOpen(false);
+    updateThemeControls();
+    setTextStyle(textColor, textWeight, false);
+    restoreLegacyTextStyle();
+    syncTextStylePanel();
+    updateMobileTabFade();
+    updatePageTitle();
     updateCounts();
     renderSearchHighlights();
+    rememberCurrentNote();
+    restoreLocalDraft();
     if (!noteLocked) {
         loadRemoteChanges();
         loadHistory();

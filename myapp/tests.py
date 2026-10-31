@@ -111,6 +111,68 @@ class NoteViewsTests(TestCase):
         self.assertTrue(response.json()["changed"])
         self.assertEqual(note.content, "new content")
 
+    def test_api_post_updates_title(self):
+        note = Note.objects.create(slug="sample")
+
+        response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"content": "body", "title": "Project notes"}),
+            content_type="application/json",
+        )
+
+        note.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["title"], "Project notes")
+        self.assertEqual(note.title, "Project notes")
+
+    def test_api_saves_text_style(self):
+        note = Note.objects.create(slug="sample")
+
+        response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({
+                "content": "Styled note",
+                "text_color": "#2563eb",
+                "text_weight": 700,
+            }),
+            content_type="application/json",
+        )
+
+        note.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(note.text_color, "#2563eb")
+        self.assertEqual(note.text_weight, 700)
+        self.assertEqual(response.json()["text_weight"], 700)
+
+    def test_content_only_save_keeps_existing_text_style(self):
+        note = Note.objects.create(
+            slug="sample",
+            content="Before",
+            text_color="#16a34a",
+            text_weight=700,
+        )
+
+        self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"content": "After"}),
+            content_type="application/json",
+        )
+
+        note.refresh_from_db()
+        self.assertEqual(note.text_color, "#16a34a")
+        self.assertEqual(note.text_weight, 700)
+
+    def test_api_rejects_invalid_text_style(self):
+        note = Note.objects.create(slug="sample")
+
+        response = self.client.post(
+            reverse("note_api", kwargs={"slug": note.slug}),
+            data=json.dumps({"text_color": "javascript:red", "text_weight": 900}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
     def test_password_is_saved_plaintext_and_locks_api(self):
         note = Note.objects.create(slug="sample", content="secret")
 
@@ -162,6 +224,11 @@ class NoteViewsTests(TestCase):
         self.assertEqual(save_response.status_code, 200)
         history = NoteHistory.objects.get(note=note)
         self.assertEqual(history.content, "first")
+
+        history_response = self.client.get(
+            reverse("note_history", kwargs={"slug": note.slug})
+        )
+        self.assertEqual(history_response.json()["history"][0]["content"], "first")
 
         restore_response = self.client.post(
             reverse("note_history", kwargs={"slug": note.slug}),

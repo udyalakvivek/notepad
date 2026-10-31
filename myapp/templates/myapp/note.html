@@ -8,11 +8,12 @@
     <title>Note {{ note.slug }}</title>
     <script>
         const savedTheme = localStorage.getItem("note-theme");
-        document.documentElement.dataset.theme = ["dark", "light", "telegram"].includes(savedTheme)
+        const availableThemes = ["dark", "light", "telegram", "ivory", "graphite", "oxford"];
+        document.documentElement.dataset.theme = availableThemes.includes(savedTheme)
             ? savedTheme
             : "dark";
     </script>
-    <link rel="stylesheet" href="{% static 'myapp/note.css' %}">
+    <link rel="stylesheet" href="{% static 'myapp/note.css' %}?v=20260906-4">
 </head>
 <body>
     <div class="ambient-glow ambient-glow-one" aria-hidden="true"></div>
@@ -29,6 +30,8 @@
                     </span>
                 </a>
 
+                <input id="note-title" class="note-title header-title" type="text" maxlength="120" value="{{ note.title }}" placeholder="Untitled note" aria-label="Note title" {% if locked %}disabled{% endif %}>
+
                 <div class="search-box" role="search">
                     <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/>
@@ -44,7 +47,7 @@
                     <span id="search-count" class="search-count" aria-live="polite"></span>
                 </div>
 
-                <div class="toolbar-actions">
+                <div class="header-actions">
                     <span
                         id="save-status"
                         class="save-status"
@@ -52,6 +55,35 @@
                         role="status"
                         aria-live="polite"
                     >Saved</span>
+                    <button id="replace-toggle" class="action-button replace-toggle" type="button">Replace</button>
+                    <div id="text-style-menu" class="text-style-menu">
+                        <button id="text-style-toggle" class="icon-button" type="button" aria-controls="text-style-panel" aria-expanded="false" aria-label="Open text style" title="Text style">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m14.8 6.2 3 3"/></svg>
+                        </button>
+                        <div id="text-style-panel" class="text-style-panel" hidden>
+                            <strong>Text style</strong>
+                            <span class="style-label">Color</span>
+                            <div class="text-color-options" aria-label="Writing text color">
+                                <button class="default-color is-active" type="button" data-text-color="default" aria-label="Theme color" title="Theme color"></button>
+                                <button type="button" data-text-color="#6b7280" aria-label="Gray" title="Gray" style="--swatch-color:#6b7280"></button>
+                                <button type="button" data-text-color="#dc2626" aria-label="Red" title="Red" style="--swatch-color:#dc2626"></button>
+                                <button type="button" data-text-color="#2563eb" aria-label="Blue" title="Blue" style="--swatch-color:#2563eb"></button>
+                                <button type="button" data-text-color="#16a34a" aria-label="Green" title="Green" style="--swatch-color:#16a34a"></button>
+                                <button type="button" data-text-color="#d97706" aria-label="Amber" title="Amber" style="--swatch-color:#d97706"></button>
+                                <label class="custom-color" title="Custom color">+
+                                    <input id="custom-text-color" type="color" value="#7c3aed" aria-label="Choose custom text color">
+                                </label>
+                            </div>
+                            <span class="style-label">Thickness</span>
+                            <div class="text-weight-options" aria-label="Writing text thickness">
+                                <button class="is-active" type="button" data-text-weight="400" aria-pressed="true"><span> A </span>Regular</button>
+                                <button type="button" data-text-weight="500" aria-pressed="false"><span> A </span>Medium</button>
+                                <button type="button" data-text-weight="700" aria-pressed="false"><span> A </span>Bold</button>
+                            </div>
+                            <button id="title-case" class="action-button title-case-button" type="button">Title Case</button>
+                            <small>Capitalize Every Word</small>
+                        </div>
+                    </div>
                     <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch theme" title="Switch theme">
                         <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
                             <circle cx="12" cy="12" r="4"/>
@@ -61,117 +93,217 @@
                             <path d="M20.5 15.6A9 9 0 0 1 8.4 3.5 9 9 0 1 0 20.5 15.6Z"/>
                         </svg>
                     </button>
-                    <button id="copy-url" class="action-button" type="button">Copy URL</button>
-                    <label class="slug-picker" for="slug-select">
-                        <span>Slug</span>
-                        <select id="slug-select" class="slug-select" data-current-slug="{{ note.slug }}" aria-label="Choose static note slug">
-                            <option value="">Auto: {{ note.slug }}</option>
-                            {% for static_slug in static_note_slugs %}
-                                <option value="{% url 'note_detail' slug=static_slug %}"{% if static_slug == note.slug %} selected{% endif %}>{{ static_slug }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <label class="password-box" for="note-password">
-                        <span class="password-field">
-                            <input
-                                id="note-password"
-                                class="password-input"
-                                type="password"
-                                placeholder="Password"
-                                autocomplete="new-password"
-                                aria-label="Note password"
-                            >
-                            <button class="password-eye" type="button" data-password-toggle="note-password" aria-label="Show password" title="Show password">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/>
-                                    <circle cx="12" cy="12" r="2.5"/>
-                                </svg>
-                            </button>
-                        </span>
-                        <button id="set-password" class="mini-button" type="button">Lock</button>
-                        <button id="clear-password" class="mini-button danger-button" type="button"{% if not has_password %} hidden{% endif %}>Remove</button>
-                    </label>
-                    <label class="history-picker" for="history-select">
-                        <span>History</span>
-                        <select id="history-select" class="history-select" aria-label="Choose note history version">
-                            <option value="">No history</option>
-                        </select>
-                        <button id="restore-history" class="mini-button" type="button" disabled>Restore</button>
-                    </label>
-                    <button id="copy-text" class="action-button" type="button">Copy Text</button>
+                    <button id="copy-text" class="action-button header-copy" type="button">Copy Text</button>
                     <label id="attach-label" class="action-button attach-button primary-action" aria-live="polite">
                         <span class="attach-label-text">Attach File</span>
                         <span class="upload-loader" aria-hidden="true"></span>
                         <input id="file-input" type="file" hidden>
                     </label>
-                    <div id="file-actions" class="file-actions" hidden>
-                        <span id="file-name" class="file-name"></span>
-                        <a id="download-file" class="action-button" href="#">Download</a>
-                        <button id="delete-file" class="action-button danger-button" type="button">Delete</button>
-                    </div>
+                    <button id="tools-toggle" class="icon-button tools-toggle" type="button" aria-controls="tools-sidebar" aria-expanded="false" aria-label="Open tools" title="Open tools">
+                        <svg class="tools-show-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+                        <svg class="tools-hide-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m7-4-3-3 3-3"/></svg>
+                    </button>
                 </div>
             </header>
 
-            <form class="editor-form{% if locked %} is-locked{% endif %}" onsubmit="return false;">
-                {% csrf_token %}
-                <div id="lock-panel" class="lock-panel"{% if not locked %} hidden{% endif %}>
-                    <div class="lock-dialog">
-                        <strong>Locked note</strong>
-                        <div class="unlock-row">
-                            <span class="password-field unlock-password-field">
-                                <input
-                                    id="unlock-password"
-                                    class="password-input"
-                                    type="password"
-                                    placeholder="Enter password"
-                                    autocomplete="current-password"
-                                    aria-label="Unlock password"
-                                >
-                                <button class="password-eye" type="button" data-password-toggle="unlock-password" aria-label="Show password" title="Show password">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/>
-                                        <circle cx="12" cy="12" r="2.5"/>
-                                    </svg>
-                                </button>
-                            </span>
-                            <button id="unlock-note" class="action-button primary-action" type="button">Unlock</button>
-                        </div>
-                        <span id="lock-message" class="lock-message" role="status" aria-live="polite"></span>
-                    </div>
-                </div>
-                <div class="editor-wrap">
-                    <div id="search-highlights" class="search-highlights" aria-hidden="true"></div>
-                    <textarea
-                        id="note-editor"
-                        class="editor"
-                        data-api-url="{% url 'note_api' slug=note.slug %}"
-                        data-file-url="{% url 'note_file' slug=note.slug %}"
-                        data-unlock-url="{% url 'note_unlock' slug=note.slug %}"
-                        data-password-url="{% url 'note_password' slug=note.slug %}"
-                        data-history-url="{% url 'note_history' slug=note.slug %}"
-                        data-locked="{% if locked %}true{% else %}false{% endif %}"
-                        data-has-password="{% if has_password %}true{% else %}false{% endif %}"
-                        data-updated-at="{{ note.updated_at|date:'c' }}"
-                        aria-label="Note content"
-                        autocomplete="off"
-                        autocapitalize="off"
-                        spellcheck="false"
-                        {% if not locked %}autofocus{% else %}disabled{% endif %}
-                        placeholder="Start writing..."
-                    >{% if not locked %}{{ note.content }}{% endif %}</textarea>
-                </div>
-            </form>
+            <div class="workspace">
+                <aside id="tools-sidebar" class="tools-sidebar" aria-label="Note tools">
+                    <nav class="sidebar-rail" aria-label="Tool sections">
+                        <button class="rail-button is-active" type="button" data-editor-focus aria-label="Editor" title="Editor">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m14.8 6.2 3 3"/></svg>
+                        </button>
+                        <button class="rail-button" type="button" data-tool-target="note-tools" aria-label="Note link" title="Note link">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/></svg>
+                        </button>
+                        <button class="rail-button" type="button" data-tool-target="security-tools" aria-label="Security" title="Security">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                        </button>
+                        <button class="rail-button" type="button" data-tool-target="history-tools" aria-label="History" title="History">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+                        </button>
+                        <button class="rail-button" type="button" data-tool-target="replace-tools" aria-label="Replace" title="Replace">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M4 17h10M16 5l3 2-3 2M16 15l3 2-3 2"/></svg>
+                        </button>
+                        <button class="rail-button style-rail-button" type="button" data-tool-target="style-tools" aria-label="Text style" title="Text style">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m14.8 6.2 3 3"/></svg>
+                        </button>
+                        <button class="rail-button" type="button" data-tool-target="file-tools" aria-label="Files" title="Files">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M13 2v7h7"/></svg>
+                        </button>
+                        <button class="rail-button" type="button" data-tool-target="appearance-tools" aria-label="Appearance" title="Appearance">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z"/></svg>
+                        </button>
+                    </nav>
 
-            <footer class="note-footer">
-                <span id="file-status" class="file-status" role="status" aria-live="polite"></span>
-                <span id="line-count-wrap">Lines: <strong id="line-count">0 / 2000</strong></span>
-                <span class="footer-divider" aria-hidden="true"></span>
-                <span>Words: <strong id="word-count">0</strong></span>
-                <span class="footer-divider" aria-hidden="true"></span>
-                <span>Characters: <strong id="character-count">0</strong></span>
-            </footer>
+                    <div class="sidebar-panel">
+                        <div class="sidebar-heading">
+                            <div><strong>Note tools</strong><span>Everything outside the editor</span></div>
+                            <button id="sidebar-close" class="icon-button sidebar-close" type="button" aria-label="Close tools">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                            </button>
+                        </div>
+
+                        <nav class="mobile-tool-tabs" aria-label="Mobile tool sections">
+                            <button type="button" data-tool-target="note-tools"><span>⌁</span>Note</button>
+                            <button type="button" data-tool-target="security-tools"><span>◉</span>Lock</button>
+                            <button type="button" data-tool-target="history-tools"><span>↶</span>History</button>
+                            <button type="button" data-tool-target="replace-tools"><span>⇄</span>Replace</button>
+                            <button type="button" data-tool-target="style-tools"><span>✎</span>Style</button>
+                            <button type="button" data-tool-target="file-tools"><span>▱</span>File</button>
+                            <button type="button" data-tool-target="appearance-tools"><span>◐</span>Theme</button>
+                        </nav>
+
+                        <section id="note-tools" class="sidebar-section">
+                            <div class="section-title"><span>⌁</span><h2>Note link</h2></div>
+                            <button id="copy-url" class="action-button sidebar-action" type="button">Copy URL</button>
+                            <label class="field-stack" for="slug-select">
+                                <span>Note address</span>
+                                <select id="slug-select" class="slug-select" data-current-slug="{{ note.slug }}" aria-label="Choose static note slug">
+                                    <option value="">Auto: {{ note.slug }}</option>
+                                    {% for static_slug in static_note_slugs %}
+                                        <option value="{% url 'note_detail' slug=static_slug %}"{% if static_slug == note.slug %} selected{% endif %}>{{ static_slug }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <div class="recent-notes-block">
+                                <div class="section-title"><span>◷</span><h2>Recent notes</h2></div>
+                                <div id="recent-notes" class="recent-notes" aria-live="polite"></div>
+                            </div>
+                        </section>
+
+                        <section id="security-tools" class="sidebar-section">
+                            <div class="section-title"><span>◉</span><h2>Security</h2></div>
+                            <label class="field-stack" for="note-password">
+                                <span>Protect with password</span>
+                                <span class="password-field sidebar-password-field">
+                                    <input id="note-password" class="password-input" type="password" placeholder="Password" autocomplete="new-password" aria-label="Note password">
+                                    <button class="password-eye" type="button" data-password-toggle="note-password" aria-label="Show password" title="Show password">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                                    </button>
+                                </span>
+                            </label>
+                            <div class="sidebar-button-row">
+                                <button id="set-password" class="mini-button" type="button">Set lock</button>
+                                <button id="clear-password" class="mini-button danger-button" type="button"{% if not has_password %} hidden{% endif %}>Remove</button>
+                            </div>
+                        </section>
+
+                        <section id="history-tools" class="sidebar-section">
+                            <div class="section-title"><span>↶</span><h2>History</h2></div>
+                            <label class="field-stack" for="history-select">
+                                <span>Recent version</span>
+                                <select id="history-select" class="history-select" aria-label="Choose note history version"><option value="">No history</option></select>
+                            </label>
+                            <button id="restore-history" class="mini-button sidebar-action" type="button" disabled>Restore version</button>
+                            <div id="history-detail" class="history-detail" hidden>
+                                <strong id="history-change-summary"></strong>
+                                <span id="history-time"></span>
+                                <pre id="history-content"></pre>
+                            </div>
+                        </section>
+
+                        <section id="replace-tools" class="sidebar-section">
+                            <div class="section-title"><span>⇄</span><h2>Replace text</h2></div>
+                            <label class="field-stack" for="replace-find-input">
+                                <span class="replace-field-label">
+                                    <span>Find</span>
+                                    <span id="replace-count">0 matches</span>
+                                </span>
+                                <span class="replace-find-row">
+                                    <input id="replace-find-input" class="sidebar-text-input" type="text" placeholder="Text to find" autocomplete="off">
+                                    <span class="replace-match-buttons" role="group" aria-label="Replace match type">
+                                        <button class="is-active" type="button" data-replace-match="characters" aria-pressed="true" aria-label="Match characters" title="Match characters">.*</button>
+                                        <button type="button" data-replace-match="word" aria-pressed="false" aria-label="Match whole word" title="Match whole word">ab</button>
+                                    </span>
+                                </span>
+                            </label>
+                            <label class="field-stack" for="replace-input">
+                                <span>Replace with</span>
+                                <input id="replace-input" class="sidebar-text-input" type="text" placeholder="New text" autocomplete="off">
+                            </label>
+                            <button id="replace-all" class="action-button sidebar-action" type="button">Replace all</button>
+                            <span id="replace-result" class="replace-result" role="status" aria-live="polite"></span>
+                        </section>
+
+                        <section id="style-tools" class="sidebar-section">
+                            <div class="section-title"><span>✎</span><h2>Text style</h2></div>
+                            <div id="mobile-style-slot"></div>
+                        </section>
+
+                        <section id="file-tools" class="sidebar-section">
+                            <div class="section-title"><span>▱</span><h2>Attachment</h2></div>
+                            <button class="action-button sidebar-action" type="button" data-attach-file>Choose file</button>
+                            <div id="file-actions" class="file-actions" hidden>
+                                <span id="file-name" class="file-name"></span>
+                                <div class="sidebar-button-row">
+                                    <a id="download-file" class="action-button" href="#">Download</a>
+                                    <button id="delete-file" class="action-button danger-button" type="button">Delete</button>
+                                </div>
+                            </div>
+                            <span id="file-status" class="file-status" role="status" aria-live="polite"></span>
+                        </section>
+
+                        <section id="appearance-tools" class="sidebar-section">
+                            <div class="section-title"><span>◐</span><h2>Appearance</h2></div>
+                            <div class="theme-grid" aria-label="Choose theme">
+                                <button type="button" data-theme-option="dark"><span class="theme-swatch dark-swatch"></span>Dark</button>
+                                <button type="button" data-theme-option="light"><span class="theme-swatch light-swatch"></span>Light</button>
+                                <button type="button" data-theme-option="telegram"><span class="theme-swatch telegram-swatch"></span>Glass</button>
+                                <button type="button" data-theme-option="ivory"><span class="theme-swatch ivory-swatch"></span>Ivory</button>
+                                <button type="button" data-theme-option="graphite"><span class="theme-swatch graphite-swatch"></span>Graphite</button>
+                                <button type="button" data-theme-option="oxford"><span class="theme-swatch oxford-swatch"></span>Oxford</button>
+                            </div>
+                        </section>
+                    </div>
+                </aside>
+
+                <div id="sidebar-scrim" class="sidebar-scrim" aria-hidden="true"></div>
+
+                <div class="editor-column">
+                    <form class="editor-form{% if locked %} is-locked{% endif %}" onsubmit="return false;">
+                        {% csrf_token %}
+                        <div id="lock-panel" class="lock-panel"{% if not locked %} hidden{% endif %}>
+                            <div class="lock-dialog">
+                                <strong>Locked note</strong>
+                                <div class="unlock-row">
+                                    <span class="password-field unlock-password-field">
+                                        <input id="unlock-password" class="password-input" type="password" placeholder="Enter password" autocomplete="current-password" aria-label="Unlock password">
+                                        <button class="password-eye" type="button" data-password-toggle="unlock-password" aria-label="Show password" title="Show password">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                                        </button>
+                                    </span>
+                                    <button id="unlock-note" class="action-button primary-action" type="button">Unlock</button>
+                                </div>
+                                <span id="lock-message" class="lock-message" role="status" aria-live="polite"></span>
+                            </div>
+                        </div>
+                        <div class="editor-wrap">
+                            <div id="search-highlights" class="search-highlights" aria-hidden="true"></div>
+                            <textarea id="note-editor" class="editor" data-api-url="{% url 'note_api' slug=note.slug %}" data-file-url="{% url 'note_file' slug=note.slug %}" data-unlock-url="{% url 'note_unlock' slug=note.slug %}" data-password-url="{% url 'note_password' slug=note.slug %}" data-history-url="{% url 'note_history' slug=note.slug %}" data-locked="{% if locked %}true{% else %}false{% endif %}" data-has-password="{% if has_password %}true{% else %}false{% endif %}" data-text-color="{{ note.text_color }}" data-text-weight="{{ note.text_weight }}" data-updated-at="{{ note.updated_at|date:'c' }}" aria-label="Note content" autocomplete="off" autocapitalize="off" spellcheck="false" {% if not locked %}autofocus{% else %}disabled{% endif %} placeholder="Start writing...">{% if not locked %}{{ note.content }}{% endif %}</textarea>
+                        </div>
+                    </form>
+
+                    <footer class="note-footer">
+                        <span id="line-count-wrap">Lines: <strong id="line-count">0 / 5000</strong></span>
+                        <span class="footer-divider" aria-hidden="true"></span>
+                        <span>Words: <strong id="word-count">0</strong></span>
+                        <span class="footer-divider" aria-hidden="true"></span>
+                        <span>Characters: <strong id="character-count">0</strong></span>
+                    </footer>
+
+                    <nav class="mobile-nav" aria-label="Primary note actions">
+                        <button type="button" data-search-focus><span>⌕</span>Find</button>
+                        <button type="button" data-copy-note><span>▣</span>Copy</button>
+                        <button type="button" data-open-tools><span>☰</span>Tools</button>
+                    </nav>
+                </div>
+            </div>
         </section>
     </main>
-    <script src="{% static 'myapp/note.js' %}"></script>
+    <div id="undo-toast" class="undo-toast" role="status" aria-live="polite" hidden>
+        <span id="undo-message"></span>
+        <button id="undo-action" type="button">Undo</button>
+    </div>
+    <script src="{% static 'myapp/note.js' %}?v=20260906-4"></script>
 </body>
 </html>

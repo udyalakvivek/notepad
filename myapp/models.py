@@ -11,7 +11,10 @@ def attachment_upload_path(instance, filename):
 
 class Note(models.Model):
     slug = models.CharField(max_length=20, unique=True)
+    title = models.CharField(max_length=120, blank=True)
     content = models.TextField(blank=True)
+    text_color = models.CharField(max_length=7, default="default")
+    text_weight = models.PositiveSmallIntegerField(default=400)
     password = models.CharField(max_length=128, blank=True)
     attachment = models.FileField(upload_to=attachment_upload_path, blank=True)
     attachment_name = models.CharField(max_length=255, blank=True)
@@ -37,4 +40,3 @@ class NoteHistory(models.Model):
 
     def __str__(self):
         return f"{self.note.slug} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
-
